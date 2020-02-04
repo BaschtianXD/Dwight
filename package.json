@@ -1,0 +1,31 @@
+{
+  "name": "dwight",
+  "version": "0.0.1",
+  "description": "",
+  "main": "dist/src/dwight.js",
+  "scripts": {
+    "start": "node -r dotenv/config dist/dwight.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BaschtianXD/Dwight.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/BaschtianXD/Dwight/issues"
+  },
+  "homepage": "https://github.com/BaschtianXD/Dwight#readme",
+  "dependencies": {
+    "@discordjs/opus": "^0.1.0",
+    "@types/node": "^13.9.4",
+    "@types/pg": "^7.14.5",
+    "aws-sdk": "^2.650.0",
+    "axios": "^0.20.0",
+    "discord.js": "github:discordjs/discord.js#v12",
+    "dotenv": "^8.2.0",
+    "pg": "^8.3.3"
+  }
+}
