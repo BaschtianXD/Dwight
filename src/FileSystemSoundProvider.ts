@@ -25,7 +25,7 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 	}
 
 	getAmountOfSounds(guildId: string): Promise<number> {
-		throw new Error("Method not implemented.");
+		return Promise.resolve(1)
 	}
 
 	initialize(): Promise<void> {
