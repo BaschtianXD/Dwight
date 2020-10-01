@@ -1,6 +1,4 @@
-import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, SnowflakeUtil, GuildChannel, MessageAttachment } from "discord.js";
-import { promises } from "dns";
-import FileSystemSoundProvider from "./FileSystemSoundProvider";
+import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message } from "discord.js";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ISoundProvider } from "./interfaces/ISoundProvider";
 import PgSoundProvider from "./PgSoundProvider";
@@ -30,7 +28,7 @@ export default class Sounds implements IAsyncInitializable {
 		this.channels = []
 
 		// TODO
-		this.provider = process.env.NODE_ENV === "development" ? new PgSoundProvider() : new FileSystemSoundProvider()
+		this.provider = new PgSoundProvider()
 	}
 
 	initialize(): Promise<void> {
@@ -57,9 +55,6 @@ export default class Sounds implements IAsyncInitializable {
 		if (!this.client.user) {
 			// Typescript cleanup
 			throw new Error("no user available. log in first!")
-		}
-		if ((process.env.NODE_ENV === "development") === (guild.id !== "608301015384588320")) {
-			return Promise.resolve()
 		}
 		const options: GuildCreateChannelOptions = {
 			type: "text",
@@ -181,9 +176,6 @@ export default class Sounds implements IAsyncInitializable {
 
 	onMessage(message: Message) {
 		if (message.author.id !== this.client.user?.id && this.channels.includes(message.channel.id) && message.guild) {
-			if (process.env.NODE_ENV !== "development") {
-				return
-			}
 			const guild = message.guild
 			const author = message.author
 			const index = message.content.indexOf(" ")
