@@ -13,6 +13,7 @@ export default class PgSoundProvider implements ISoundProvider {
 	constructor() {
 	}
 
+
 	initialize(): Promise<void> {
 		return this.prepareDatabase()
 	}
@@ -40,7 +41,7 @@ export default class PgSoundProvider implements ISoundProvider {
 			.then(([numSounds, limit]) => new Promise((resolve, reject) => numSounds >= limit ? reject("Limit reached") : resolve()))
 			.then(() => this.download(url, this.basePath + "/" + id + ".mp3"))
 			.then(() => db.query("INSERT INTO sounds.sounds VALUES ($1, $2, $3)", [id, guildId, name]))
-			.then()
+			.then(() => Promise.resolve())
 	}
 
 	removeSound(soundId: string): Promise<void> {
@@ -53,7 +54,7 @@ export default class PgSoundProvider implements ISoundProvider {
 		return db.query("DELETE FROM sounds.sounds WHERE guildID = $1 RETURNING *", [guildId])
 			.then(queryresult => Promise.all(queryresult.rows.map(value => this.getPathToSound(value.soundID))))
 			.then(paths => Promise.all(paths.map(value => fs.promises.unlink(value))))
-			.then()
+			.then(() => Promise.resolve())
 	}
 
 	getAmountOfSounds(guildId: string): Promise<number> {
@@ -70,6 +71,13 @@ export default class PgSoundProvider implements ISoundProvider {
 					return Promise.resolve(this.defaultSoundLimit)
 				}
 			})
+	}
+
+	soundPlayed(userId: string, soundId: string): Promise<void> {
+		const date = new Date()
+		return db.query("INSERT INTO sounds.plays VALUES( $1, $2, $3 )", [userId, soundId, date.toISOString()])
+			.then(() => Promise.resolve())
+			.catch(reason => console.log(Date.now() + ": " + reason))
 	}
 
 	private prepareDatabase() {

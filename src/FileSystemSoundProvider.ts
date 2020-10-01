@@ -9,7 +9,7 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 	maxSoundNameLength = 64
 
 	constructor() {
-		this.baseFilePath = process.env.DWIGHT_SOUNDS_PATH || process.cwd() + "/../sounds"
+		this.baseFilePath = process.env.DWIGHT_SOUNDS_PATH || process.cwd() + "/sounds"
 
 		if (!this.baseFilePath) {
 			console.error("No baseFilePath for sounds")
@@ -22,6 +22,9 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 			console.log("Could not read filepath: " + this.baseFilePath)
 			return
 		}
+	}
+	soundPlayed(userId: string, soundId: string): Promise<void> {
+		return Promise.resolve()
 	}
 
 	getAmountOfSounds(guildId: string): Promise<number> {
@@ -53,7 +56,7 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 	}
 
 	getPathToSound(soundId: Snowflake): Promise<string> {
-		return new Promise(resolve => this.baseFilePath + "/" + soundId + ".mp3")
+		return Promise.resolve(this.baseFilePath + "/" + soundId + ".mp3")
 	}
 
 	addSoundForGuild(guildId: Snowflake, url: string, name: string): Promise<void> {

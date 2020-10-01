@@ -56,6 +56,13 @@ export interface ISoundProvider extends IAsyncInitializable {
 	 */
 	getLimitForGuild(guildId: Snowflake): Promise<number>
 
+	/**
+	 * Logs a played sound
+	 * @param userId Id of the user
+	 * @param soundId Id of the sound
+	 */
+	soundPlayed(userId: Snowflake, soundId: Snowflake): Promise<void>
+
 }
 
 export type TSoundListEntry = {

@@ -1,4 +1,4 @@
-import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, SnowflakeUtil, GuildChannel } from "discord.js";
+import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, SnowflakeUtil, GuildChannel, MessageAttachment } from "discord.js";
 import { promises } from "dns";
 import FileSystemSoundProvider from "./FileSystemSoundProvider";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
@@ -77,11 +77,9 @@ export default class Sounds implements IAsyncInitializable {
 		}
 		var channelManager: GuildChannelManager
 		// No sounds => no need to init
-		console.log("Get amount for Guild: " + guild.name)
 		return this.provider.getAmountOfSounds(guild.id)
 			.then(numSounds => numSounds > 0 ? Promise.resolve() : Promise.reject("no sounds"))
 			.then(() => {
-				console.log("We got here for guild: " + guild.name)
 				this.guildFlakes.push(guild.id)
 				channelManager = guild.channels
 				const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === "text") as TextChannel
@@ -101,14 +99,15 @@ export default class Sounds implements IAsyncInitializable {
 				this.channels.push(channel.id)
 				this.addSoundsToChannel(channel)
 			}).catch(reason => {
-				console.error(new Date() + ": " + reason)
+				console.log(new Date() + ": " + reason)
+				console.trace()
 			})
 	}
 
 	addSoundsToChannel(channel: TextChannel) {
 		this.provider.getListOfSoundsForGuild(channel.guild.id)
 			.then(list => {
-				list.forEach((sound, index) => {
+				list.forEach((sound) => {
 					channel.send(sound.name)
 						.then(message => message.react("🔊"))
 						.then(messagereaction => {
@@ -116,11 +115,11 @@ export default class Sounds implements IAsyncInitializable {
 						})
 						.catch(reason => {
 							console.log(new Date() + ": " + reason)
+							console.trace()
 						})
 				}
 				)
 			})
-
 	}
 
 	onMessageReactionAdd(messageReaction: MessageReaction, user: User) {
@@ -132,34 +131,39 @@ export default class Sounds implements IAsyncInitializable {
 			const voiceChannel = guild.member(user)?.voice.channel
 			const soundId = this.messages.get(messageReaction.message.id)
 			if (voiceChannel && soundId) {
-				this.playSoundInChannel(soundId, voiceChannel)
+				this.playSoundInChannel(soundId, voiceChannel, user.id)
 			}
 
 			// remove reaction
 			messageReaction.users.remove(user)
-				.catch(reason => console.log(new Date() + ": " + reason))
+				.catch(reason => {
+					console.log(new Date() + ": " + reason)
+					console.trace()
+				})
 		}
 	}
 
-	playSoundInChannel(soundId: Snowflake, voiceChannel: VoiceChannel) {
+	playSoundInChannel(soundId: Snowflake, voiceChannel: VoiceChannel, userId: Snowflake) {
 		const disp = this.connections.get(voiceChannel.id)
 		if (disp) {
 			disp.pause()
 		} else {
 			this.provider.getPathToSound(soundId)
-				.then(soundPath => {
-					voiceChannel.join()
-						.then(connection => {
-							const dispatcher = connection.play(soundPath, { "volume": false })
-							dispatcher.on("speaking", speaking => {
-								if (!speaking) {
-									voiceChannel.leave()
-									this.connections.delete(voiceChannel.id)
-								}
-							})
-							this.connections.set(voiceChannel.id, dispatcher)
-						})
-						.catch(reason => console.log(new Date() + ": " + reason))
+				.then(soundPath => Promise.all([soundPath, voiceChannel.join()]))
+				.then(([soundPath, connection]) => {
+					const dispatcher = connection.play(soundPath, { "volume": false })
+					dispatcher.on("speaking", speaking => {
+						if (!speaking) {
+							voiceChannel.leave()
+							this.connections.delete(voiceChannel.id)
+						}
+					})
+					this.connections.set(voiceChannel.id, dispatcher)
+					this.provider.soundPlayed(userId, soundId)
+				})
+				.catch(reason => {
+					console.log(new Date() + ": " + reason)
+					console.trace()
 				})
 
 		}
@@ -176,34 +180,56 @@ export default class Sounds implements IAsyncInitializable {
 	}
 
 	onMessage(message: Message) {
-		if (message.guild) {
+		if (message.author.id !== this.client.user?.id && this.channels.includes(message.channel.id) && message.guild) {
 			if (process.env.NODE_ENV !== "development") {
 				return
 			}
+			const guild = message.guild
+			const author = message.author
 			const index = message.content.indexOf(" ")
-			if (index !== -1 && message.content.substring(0, index) === "!add_sound" && message.content.substring(index + 1).length > 0) {
-				if (message.attachments.size < 1) {
-					message.reply("no sound attached to add.")
-				} else if (message.attachments.size > 1) {
-					message.reply("only 1 sound allowed per command")
-				} else {
-					const name = message.content.substring(index + 1)
-					const attachment = message.attachments.first()!
-					if (attachment.size > this.maxFileSize) {
-						message.reply("sound is too big. Max 200kb")
-					} else if (!attachment.name || attachment.name.endsWith(".mp3") && !attachment.name.includes("\\") && !attachment.name.includes("'") && attachment.name.length < this.provider.maxSoundNameLength) {
-						const guild = message.guild
-						this.provider.addSoundForGuild(guild.id, attachment.url, name)
-							.then(_ => {
-								this.initForGuild(guild)
-							})
-							.catch(reason => {
-								message.reply("there was an error, sorry")
-								console.log(Date.now() + ": " + reason)
-							})
+			if (index !== -1 && message.content.substring(index + 1).length > 0) {
+				const name = message.content.substring(index + 1)
+				if (message.content.substring(0, index) === "!add_sound") {
+					if (message.attachments.size < 1) {
+						author.send("no sound attached to add.")
+					} else if (message.attachments.size > 1) {
+						author.send("only 1 sound allowed per command")
+					} else {
+						const attachment = message.attachments.first()!
+						if (attachment.size > this.maxFileSize) {
+							author.send("sound is too big. Max 200kb")
+						} else if (!attachment.name || attachment.name.endsWith(".mp3") && !attachment.name.includes("\\") && !attachment.name.includes("'") && attachment.name.length < this.provider.maxSoundNameLength) {
+							const guild = message.guild
+							this.provider.addSoundForGuild(guild.id, attachment.url, name)
+								.then(_ => {
+									this.initForGuild(guild)
+								})
+								.catch(reason => {
+									author.send("there was an error, sorry")
+									console.log(Date.now() + ": " + reason)
+									console.trace()
+								})
+						}
 					}
+				} else if (message.content.substring(0, index) === "!remove_sound" || message.content.substring(0, index) === "!delete_sound") {
+					this.provider.getListOfSoundsForGuild(message.guild.id)
+						.then(list => {
+							const rest = list.filter(value => value.name === name)
+							if (rest[0]) {
+								this.provider.removeSound(rest[0].id)
+									//.then(() => author.send("Sound " + rest[0].name + " deleted."))
+									.then(() => this.initForGuild(guild))
+							} else {
+								author.send("No sound with that name found.")
+							}
+						})
 				}
 			}
+			message.delete()
+				.catch(reason => {
+					console.log(Date.now() + ": " + reason)
+					console.trace()
+				})
 		}
 
 	}
