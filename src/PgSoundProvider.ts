@@ -22,8 +22,8 @@ export default class PgSoundProvider implements ISoundProvider {
 			.then(result => {
 				const res = result.rows.map(value => {
 					return {
-						id: value["soundID"] as Snowflake,
-						name: value["name"] as string
+						id: value.soundid as Snowflake,
+						name: value.name as string
 					}
 				})
 				return res
@@ -62,7 +62,7 @@ export default class PgSoundProvider implements ISoundProvider {
 	}
 
 	getLimitForGuild(guildId: string): Promise<number> {
-		return db.query("SELECT limit FROM sounds.limits WHERE guildID = $1", [guildId])
+		return db.query("SELECT maxsounds FROM sounds.limits WHERE guildID = $1", [guildId])
 			.then(qResult => {
 				if (qResult.rowCount === 1) {
 					return Promise.resolve(qResult.rows[0].limit as number)
@@ -73,10 +73,10 @@ export default class PgSoundProvider implements ISoundProvider {
 	}
 
 	private prepareDatabase() {
-		return db.query("CREATE SCHEMA IF NOT EXISTS sounds")
-			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.sounds ( soundID BIGINT PRIMARY KEY, guildID BIGINT NOT NULL, name VARCHAR($1) NOT NULL)", [this.maxSoundNameLength.toString()]))
-			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.limits ( guildID BIGINT PRIMARY KEY, limit SMALLINT NOT NULL DEFAULT 20 )"))
-			.then(_ => { db.query("CREATE TABLE IF NOT EXISTS sounds.plays ( userID BIGINT, soundID BIGINT, time TIMESTAMP") })
+		return db.query("CREATE SCHEMA IF NOT EXISTS sounds;")
+			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.sounds ( soundID BIGINT PRIMARY KEY, guildID BIGINT NOT NULL, name VARCHAR(64) NOT NULL);"))
+			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.limits ( guildID BIGINT PRIMARY KEY, maxsounds SMALLINT NOT NULL);"))
+			.then(_ => { db.query("CREATE TABLE IF NOT EXISTS sounds.plays ( userID BIGINT NOT NULL, soundID BIGINT NOT NULL, time TIMESTAMP NOT NULL);") })
 			.catch(reason => {
 				throw new Error("DB ERROR - Setup: " + reason)
 			})
@@ -106,7 +106,7 @@ TABLE: sounds.sounds:
 TABLE: sounds.limits:
 	FIELDS:
 		- guildID: bigint primary key (snowflake)
-		- limit: smallint
+		- maxsounds: smallint
 TABLE: sounds.plays:
 	FIELDS:
 		- userID: bigint (snowflake)

@@ -1,4 +1,5 @@
 import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, SnowflakeUtil, GuildChannel } from "discord.js";
+import { promises } from "dns";
 import FileSystemSoundProvider from "./FileSystemSoundProvider";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ISoundProvider } from "./interfaces/ISoundProvider";
@@ -16,7 +17,7 @@ export default class Sounds implements IAsyncInitializable {
 	connections: Collection<Snowflake, StreamDispatcher>
 
 	// Message id -> index of sound
-	messages: Collection<Snowflake, number>
+	messages: Collection<Snowflake, Snowflake>
 	channels: Snowflake[]
 
 	provider: ISoundProvider
@@ -57,7 +58,7 @@ export default class Sounds implements IAsyncInitializable {
 			// Typescript cleanup
 			throw new Error("no user available. log in first!")
 		}
-		if ((process.env.NODE_ENV === "development") !== (guild.id !== "608301015384588320")) {
+		if ((process.env.NODE_ENV === "development") === (guild.id !== "608301015384588320")) {
 			return Promise.resolve()
 		}
 		const options: GuildCreateChannelOptions = {
@@ -76,9 +77,11 @@ export default class Sounds implements IAsyncInitializable {
 		}
 		var channelManager: GuildChannelManager
 		// No sounds => no need to init
+		console.log("Get amount for Guild: " + guild.name)
 		return this.provider.getAmountOfSounds(guild.id)
-			.then(numSounds => new Promise((resolve, reject) => numSounds > 0 ? resolve() : reject()))
+			.then(numSounds => numSounds > 0 ? Promise.resolve() : Promise.reject("no sounds"))
 			.then(() => {
+				console.log("We got here for guild: " + guild.name)
 				this.guildFlakes.push(guild.id)
 				channelManager = guild.channels
 				const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === "text") as TextChannel
@@ -88,6 +91,8 @@ export default class Sounds implements IAsyncInitializable {
 				}
 			})
 			.then(() => this.createChannel(channelManager, options))
+			.catch((reason) => reason !== "no sounds" ? Promise.reject() : Promise.resolve())
+
 	}
 
 	createChannel(channelManager: GuildChannelManager, options: GuildCreateChannelOptions) {
@@ -104,10 +109,10 @@ export default class Sounds implements IAsyncInitializable {
 		this.provider.getListOfSoundsForGuild(channel.guild.id)
 			.then(list => {
 				list.forEach((sound, index) => {
-					channel.send(sound)
+					channel.send(sound.name)
 						.then(message => message.react("🔊"))
 						.then(messagereaction => {
-							this.messages.set(messagereaction.message.id, index)
+							this.messages.set(messagereaction.message.id, sound.id)
 						})
 						.catch(reason => {
 							console.log(new Date() + ": " + reason)
@@ -125,8 +130,9 @@ export default class Sounds implements IAsyncInitializable {
 		const guild = messageReaction.message.guild
 		if (this.channels.includes(messageReaction.message.channel.id)) {
 			const voiceChannel = guild.member(user)?.voice.channel
-			if (voiceChannel) {
-				this.playSoundInChannel(messageReaction.message.content, voiceChannel)
+			const soundId = this.messages.get(messageReaction.message.id)
+			if (voiceChannel && soundId) {
+				this.playSoundInChannel(soundId, voiceChannel)
 			}
 
 			// remove reaction
@@ -135,12 +141,12 @@ export default class Sounds implements IAsyncInitializable {
 		}
 	}
 
-	playSoundInChannel(sound: string, voiceChannel: VoiceChannel) {
+	playSoundInChannel(soundId: Snowflake, voiceChannel: VoiceChannel) {
 		const disp = this.connections.get(voiceChannel.id)
 		if (disp) {
 			disp.pause()
 		} else {
-			this.provider.getPathToSound(sound)
+			this.provider.getPathToSound(soundId)
 				.then(soundPath => {
 					voiceChannel.join()
 						.then(connection => {
