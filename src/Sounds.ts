@@ -9,8 +9,6 @@ export default class Sounds implements IAsyncInitializable {
 	maxFileSize = 204800 // 200 kb
 
 	client: Client
-	// Snowflakes of guilds we joined
-	guildFlakes: Snowflake[]
 	// Snowflake -> Id of channel
 	connections: Collection<Snowflake, StreamDispatcher>
 
@@ -22,7 +20,6 @@ export default class Sounds implements IAsyncInitializable {
 
 	constructor(client: Client) {
 		this.client = client
-		this.guildFlakes = []
 		this.connections = new Collection()
 		this.messages = new Collection()
 		this.channels = []
@@ -71,11 +68,8 @@ export default class Sounds implements IAsyncInitializable {
 			]
 		}
 		var channelManager: GuildChannelManager
-		// No sounds => no need to init
 		return this.provider.getAmountOfSounds(guild.id)
-			.then(numSounds => numSounds > 0 ? Promise.resolve() : Promise.reject("no sounds"))
 			.then(() => {
-				this.guildFlakes.push(guild.id)
 				channelManager = guild.channels
 				const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === "text") as TextChannel
 				if (oldChannel) {
@@ -84,7 +78,10 @@ export default class Sounds implements IAsyncInitializable {
 				}
 			})
 			.then(() => this.createChannel(channelManager, options))
-			.catch((reason) => reason !== "no sounds" ? Promise.reject() : Promise.resolve())
+			.catch(reason => {
+				console.log(Date.now() + ": " + reason)
+				console.trace()
+			})
 
 	}
 
@@ -118,7 +115,7 @@ export default class Sounds implements IAsyncInitializable {
 	}
 
 	onMessageReactionAdd(messageReaction: MessageReaction, user: User) {
-		if (user.id === this.client.user?.id || !(messageReaction.message.guild && this.guildFlakes.includes(messageReaction.message.guild.id))) {
+		if (user.id === this.client.user?.id || !(messageReaction.message.guild)) {
 			return
 		}
 		const guild = messageReaction.message.guild
