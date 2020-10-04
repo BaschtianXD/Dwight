@@ -1,4 +1,4 @@
-import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message } from "discord.js";
+import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, DMChannel } from "discord.js";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ISoundProvider } from "./interfaces/ISoundProvider";
 import PgSoundProvider from "./PgSoundProvider";
@@ -14,15 +14,20 @@ export default class Sounds implements IAsyncInitializable {
 
 	// Message id -> index of sound
 	messages: Collection<Snowflake, Snowflake>
-	channels: Snowflake[]
+	channels: TextChannel[]
 
 	provider: ISoundProvider
+
+	currentBuilds: Guild[]
+	needsRebuild: Guild[]
 
 	constructor(client: Client) {
 		this.client = client
 		this.connections = new Collection()
 		this.messages = new Collection()
 		this.channels = []
+		this.currentBuilds = []
+		this.needsRebuild = []
 
 		// TODO
 		this.provider = new PgSoundProvider()
@@ -43,9 +48,11 @@ export default class Sounds implements IAsyncInitializable {
 
 	onReady(client: Client) {
 		const guilds = Array.from(client.guilds.cache.values())
-		guilds.forEach(guild => {
-			this.initForGuild(guild)
-		})
+		guilds.reduce((acc, cur) => acc.then(() => this.initForGuild(cur)), Promise.resolve())
+			.catch(reason => {
+				console.error(new Date() + ": " + reason)
+				console.trace()
+			})
 	}
 
 	initForGuild(guild: Guild): Promise<void> {
@@ -53,64 +60,82 @@ export default class Sounds implements IAsyncInitializable {
 			// Typescript cleanup
 			throw new Error("no user available. log in first!")
 		}
+
+		// check if the channel is getting build right now
+		if (this.currentBuilds.includes(guild)) {
+			this.needsRebuild.push(guild)
+			return Promise.resolve()
+		}
+		const channelManager = guild.channels
+		this.currentBuilds.push(guild)
+		return this.createChannel(channelManager, this.client.user.id)
+			.then(this.addSoundsToChannel)
+			.then(() => {
+				this.currentBuilds.splice(this.currentBuilds.indexOf(guild), 1)
+				const index = this.needsRebuild.indexOf(guild)
+				if (index !== -1) {
+					this.needsRebuild.splice(index, 1)
+					return this.initForGuild(guild)
+				}
+			})
+			.catch(reason => {
+				console.error(new Date() + ": " + reason)
+				console.trace()
+			})
+
+	}
+
+	createChannel(channelManager: GuildChannelManager, userId: Snowflake): Promise<TextChannel> {
 		const options: GuildCreateChannelOptions = {
 			type: "text",
 			topic: "Here are the sounds you can play. Press the reaction of a sound to play it in your voice channel.",
 			permissionOverwrites: [
 				{
-					id: guild.id,
+					id: channelManager.guild.id,
 					deny: ['SEND_MESSAGES', 'ADD_REACTIONS']
 				},
 				{
-					id: this.client.user.id,
+					id: userId,
 					allow: ['SEND_MESSAGES', 'ADD_REACTIONS']
 				}
 			]
 		}
-		var channelManager: GuildChannelManager
-		return this.provider.getAmountOfSounds(guild.id)
-			.then(() => {
-				channelManager = guild.channels
-				const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === "text") as TextChannel
-				if (oldChannel) {
-					options.position = oldChannel.position
-					return oldChannel.delete("recreation of channel")
+
+		const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === "text")
+		if (oldChannel) {
+			if (oldChannel.deletable) {
+				return oldChannel.delete("I need to recreate the channel")
+					.then(() => channelManager.create("sounds", options) as Promise<TextChannel>)
+					.then(channel => {
+						this.channels.push(channel)
+						return channel
+					})
+			} else {
+				if (channelManager.guild.owner) {
+					channelManager.guild.owner.send("I could not delete the former sounds channel. Please check my permissions and allow me to do so. Then contact my creator Bauer#9456.")
 				}
-			})
-			.then(() => this.createChannel(channelManager, options))
+				return Promise.reject("missing permission")
+			}
+		} else {
+			return channelManager.create("sounds", options)
+				.then(channel => {
+					this.channels.push(channel as TextChannel)
+					return channel as TextChannel
+				})
+		}
+	}
+
+	addSoundsToChannel(channel: TextChannel): Promise<void> {
+		return this.provider.getListOfSoundsForGuild(channel.guild.id)
+			.then(list => list.reduce((acc, cur) =>
+				acc.then(() => channel.send(cur.name))
+					.then(message => message.react("🔊"))
+					.then(reaction => {
+						this.messages.set(reaction.message.id, cur.id)
+					}), Promise.resolve()))
 			.catch(reason => {
-				console.log(Date.now() + ": " + reason)
+				console.error(new Date() + ": " + reason)
 				console.trace()
-			})
-
-	}
-
-	createChannel(channelManager: GuildChannelManager, options: GuildCreateChannelOptions) {
-		channelManager.create("sounds", options)
-			.then((channel: TextChannel) => {
-				this.channels.push(channel.id)
-				this.addSoundsToChannel(channel)
-			}).catch(reason => {
-				console.log(new Date() + ": " + reason)
-				console.trace()
-			})
-	}
-
-	addSoundsToChannel(channel: TextChannel) {
-		this.provider.getListOfSoundsForGuild(channel.guild.id)
-			.then(list => {
-				list.forEach((sound) => {
-					channel.send(sound.name)
-						.then(message => message.react("🔊"))
-						.then(messagereaction => {
-							this.messages.set(messagereaction.message.id, sound.id)
-						})
-						.catch(reason => {
-							console.log(new Date() + ": " + reason)
-							console.trace()
-						})
-				}
-				)
 			})
 	}
 
@@ -119,7 +144,7 @@ export default class Sounds implements IAsyncInitializable {
 			return
 		}
 		const guild = messageReaction.message.guild
-		if (this.channels.includes(messageReaction.message.channel.id)) {
+		if (this.channels.includes(messageReaction.message.channel as TextChannel)) {
 			const voiceChannel = guild.member(user)?.voice.channel
 			const soundId = this.messages.get(messageReaction.message.id)
 			if (voiceChannel && soundId) {
@@ -129,7 +154,7 @@ export default class Sounds implements IAsyncInitializable {
 			// remove reaction
 			messageReaction.users.remove(user)
 				.catch(reason => {
-					console.log(new Date() + ": " + reason)
+					console.error(new Date() + ": " + reason)
 					console.trace()
 				})
 		}
@@ -154,7 +179,7 @@ export default class Sounds implements IAsyncInitializable {
 					this.provider.soundPlayed(userId, soundId)
 				})
 				.catch(reason => {
-					console.log(new Date() + ": " + reason)
+					console.error(new Date() + ": " + reason)
 					console.trace()
 				})
 
@@ -172,8 +197,8 @@ export default class Sounds implements IAsyncInitializable {
 	}
 
 	onMessage(message: Message) {
-		if (message.author.id !== this.client.user?.id && this.channels.includes(message.channel.id) && message.guild) {
-			const guild = message.guild
+		if (message.author.id !== this.client.user?.id && this.isTextChannel(message.channel) && this.channels.includes(message.channel)) {
+			const guild = message.channel.guild
 			const author = message.author
 			const index = message.content.indexOf(" ")
 			if (index !== -1 && message.content.substring(index + 1).length > 0) {
@@ -188,25 +213,25 @@ export default class Sounds implements IAsyncInitializable {
 						if (attachment.size > this.maxFileSize) {
 							author.send("sound is too big. Max 200kb")
 						} else if (!attachment.name || attachment.name.endsWith(".mp3") && !attachment.name.includes("\\") && !attachment.name.includes("'") && attachment.name.length < this.provider.maxSoundNameLength) {
-							const guild = message.guild
-							this.provider.addSoundForGuild(guild.id, attachment.url, name)
-								.then(_ => {
-									this.initForGuild(guild)
-								})
+							this.provider.addSoundForGuild(message.channel.guild.id, attachment.url, name)
+								.then(_ => this.initForGuild(guild))
 								.catch(reason => {
+									if (reason === "limit reached") {
+										author.send("you have already reached the maximum number of sounds.")
+										return
+									}
 									author.send("there was an error, sorry")
-									console.log(Date.now() + ": " + reason)
+									console.error(Date.now() + ": " + reason)
 									console.trace()
 								})
 						}
 					}
 				} else if (message.content.substring(0, index) === "!remove_sound" || message.content.substring(0, index) === "!delete_sound") {
-					this.provider.getListOfSoundsForGuild(message.guild.id)
+					this.provider.getListOfSoundsForGuild(guild.id)
 						.then(list => {
 							const rest = list.filter(value => value.name === name)
 							if (rest[0]) {
 								this.provider.removeSound(rest[0].id)
-									//.then(() => author.send("Sound " + rest[0].name + " deleted."))
 									.then(() => this.initForGuild(guild))
 							} else {
 								author.send("No sound with that name found.")
@@ -216,10 +241,14 @@ export default class Sounds implements IAsyncInitializable {
 			}
 			message.delete()
 				.catch(reason => {
-					console.log(Date.now() + ": " + reason)
+					console.error(Date.now() + ": " + reason)
 					console.trace()
 				})
 		}
 
+	}
+
+	isTextChannel(channel: TextChannel | DMChannel): channel is TextChannel {
+		return channel.type === "text"
 	}
 }
