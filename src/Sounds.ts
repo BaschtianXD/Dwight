@@ -69,7 +69,7 @@ export default class Sounds implements IAsyncInitializable {
 		const channelManager = guild.channels
 		this.currentBuilds.push(guild)
 		return this.createChannel(channelManager, this.client.user.id)
-			.then(this.addSoundsToChannel)
+			.then(this.addSoundsToChannel.bind(this))
 			.then(() => {
 				this.currentBuilds.splice(this.currentBuilds.indexOf(guild), 1)
 				const index = this.needsRebuild.indexOf(guild)
