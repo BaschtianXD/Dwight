@@ -19,7 +19,7 @@ export default class PgSoundProvider implements ISoundProvider {
 	}
 
 	getListOfSoundsForGuild(guildId: string): Promise<TSoundListEntry[]> {
-		return db.query("SELECT soundID, name FROM sounds.sounds WHERE guildID = $1", [guildId])
+		return db.query("SELECT soundID, name FROM sounds.sounds WHERE guildID = $1 ORDER BY name ASC", [guildId])
 			.then(result => {
 				const res = result.rows.map(value => {
 					return {
