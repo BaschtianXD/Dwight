@@ -1,3 +1,7 @@
+# Sounds folder
+sounds
+
+
 # Logs
 logs
 *.log
@@ -65,3 +69,6 @@ typings/
 
 # dwight tsc build folder
 dist
+
+#my stuff
+.me
