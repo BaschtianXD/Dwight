@@ -84,7 +84,7 @@ export default class PgSoundProvider implements ISoundProvider {
 		return db.query("CREATE SCHEMA IF NOT EXISTS sounds;")
 			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.sounds ( soundID BIGINT PRIMARY KEY, guildID BIGINT NOT NULL, soundname VARCHAR(64) NOT NULL);"))
 			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.limits ( guildID BIGINT PRIMARY KEY, maxsounds SMALLINT NOT NULL);"))
-			.then(_ => { db.query("CREATE TABLE IF NOT EXISTS sounds.plays ( userID BIGINT NOT NULL, soundID BIGINT NOT NULL, time TIMESTAMP NOT NULL);") })
+			.then(_ => { db.query("CREATE TABLE IF NOT EXISTS sounds.plays ( userID BIGINT NOT NULL, soundID BIGINT NOT NULL, time TIMESTAMPZ NOT NULL);") })
 			.catch(reason => {
 				throw new Error("DB ERROR - Setup: " + reason)
 			})

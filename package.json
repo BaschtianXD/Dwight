@@ -27,5 +27,8 @@
     "discord.js": "github:discordjs/discord.js#v12",
     "dotenv": "^8.2.0",
     "pg": "^8.3.3"
+  },
+  "devDependencies": {
+    "typescript": "^4.0.5"
   }
 }
