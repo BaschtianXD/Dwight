@@ -19,7 +19,7 @@ export default class PgSoundProvider implements ISoundProvider {
 	}
 
 	getListOfSoundsForGuild(guildId: string): Promise<TSoundListEntry[]> {
-		return db.query("SELECT soundID, name FROM sounds.sounds WHERE guildID = $1 ORDER BY name ASC", [guildId])
+		return db.query("SELECT soundID, soundname FROM sounds.sounds WHERE guildID = $1 ORDER BY soundname ASC", [guildId])
 			.then(result => {
 				const res = result.rows.map(value => {
 					return {
@@ -82,7 +82,7 @@ export default class PgSoundProvider implements ISoundProvider {
 
 	private prepareDatabase() {
 		return db.query("CREATE SCHEMA IF NOT EXISTS sounds;")
-			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.sounds ( soundID BIGINT PRIMARY KEY, guildID BIGINT NOT NULL, name VARCHAR(64) NOT NULL);"))
+			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.sounds ( soundID BIGINT PRIMARY KEY, guildID BIGINT NOT NULL, soundname VARCHAR(64) NOT NULL);"))
 			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.limits ( guildID BIGINT PRIMARY KEY, maxsounds SMALLINT NOT NULL);"))
 			.then(_ => { db.query("CREATE TABLE IF NOT EXISTS sounds.plays ( userID BIGINT NOT NULL, soundID BIGINT NOT NULL, time TIMESTAMP NOT NULL);") })
 			.catch(reason => {
