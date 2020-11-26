@@ -130,10 +130,16 @@ export default class Sounds implements IAsyncInitializable {
 	addSoundsToChannel(channel: TextChannel): Promise<void> {
 		return this.provider.getSoundsForGuild(channel.guild.id)
 			.then(list => list.reduce((acc, cur) =>
-				acc.then(() => channel.send(cur.name))
+				acc.then(() => {
+					return channel.send(cur.name)
+				})
 					.then(message => message.react("🔊"))
 					.then(reaction => {
-						this.messages.set(reaction.message.id, cur.id)
+						return new Promise(resolve => {
+							this.messages.set(reaction.message.id, cur.id)
+							// Set timeout so we dont hit the rate limit
+							setTimeout(() => resolve(), 250)
+						})
 					}), Promise.resolve()))
 			.catch(reason => {
 				console.error(new Date() + ": " + reason)
