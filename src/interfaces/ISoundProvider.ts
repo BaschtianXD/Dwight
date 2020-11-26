@@ -1,7 +1,13 @@
 import { Snowflake } from "discord.js";
+import { EventEmitter } from "events";
 import IAsyncInitializable from "./IAsyncInitializable";
+import { TypedEmitter } from 'tiny-typed-emitter';
 
-export interface ISoundProvider extends IAsyncInitializable {
+export interface ISoundProviderEvents {
+	"soundsChangedForGuild": (guildId: string) => void
+}
+
+export interface ISoundProvider extends IAsyncInitializable, TypedEmitter<ISoundProviderEvents> {
 
 	maxSoundNameLength: number
 
@@ -10,7 +16,7 @@ export interface ISoundProvider extends IAsyncInitializable {
 	 * @param guildId Id of guild
 	 * @returns A promise resolving to the list of sounds of the given guild
 	 */
-	getListOfSoundsForGuild(guildId: Snowflake): Promise<TSoundListEntry[]>
+	getSoundsForGuild(guildId: Snowflake): Promise<TSoundListEntry[]>
 
 	/**
 	 * 

@@ -1,11 +1,11 @@
-import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, DMChannel } from "discord.js";
+import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, DMChannel, NewsChannel, VoiceState } from "discord.js";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ISoundProvider } from "./interfaces/ISoundProvider";
 import PgSoundProvider from "./PgSoundProvider";
 
 export default class Sounds implements IAsyncInitializable {
 
-	//PARAMETER
+	// PARAMETER
 	maxFileSize = 204800 // 200 kb
 
 	client: Client
@@ -29,7 +29,6 @@ export default class Sounds implements IAsyncInitializable {
 		this.currentBuilds = []
 		this.needsRebuild = []
 
-		// TODO
 		this.provider = new PgSoundProvider()
 	}
 
@@ -38,10 +37,11 @@ export default class Sounds implements IAsyncInitializable {
 			.then(_ => {
 				// Typecasting as we dont have partials enabled
 				this.client.on("messageReactionAdd", (reaction, user) => this.onMessageReactionAdd(reaction, user as User))
-				this.client.on("ready", _ => this.onReady(this.client))
+				this.client.on("ready", () => this.onReady(this.client))
 				this.client.on("guildCreate", guild => this.onGuildCreate(guild))
 				this.client.on("guildDelete", guild => this.onGuildDelete(guild))
 				this.client.on("message", message => this.onMessage(message as Message))
+				this.provider.on("soundsChangedForGuild", this.onSoundsChangedForGuild)
 				console.log("Sounds initialized")
 			})
 	}
@@ -88,7 +88,7 @@ export default class Sounds implements IAsyncInitializable {
 	createChannel(channelManager: GuildChannelManager, userId: Snowflake): Promise<TextChannel> {
 		const options: GuildCreateChannelOptions = {
 			type: "text",
-			topic: "Here are the sounds you can play. Press the reaction of a sound to play it in your voice channel.",
+			topic: "Here are the sounds you can play. Press the reaction of a sound to play it in your voice channel. Send '!add_sound soundname' with a soundfile (mp3, max 200kb) attached to this channel to add a sound and send '!remove_sound soundname' to this channel to remove a sound.",
 			permissionOverwrites: [
 				{
 					id: channelManager.guild.id,
@@ -104,6 +104,8 @@ export default class Sounds implements IAsyncInitializable {
 		const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === "text")
 		if (oldChannel) {
 			if (oldChannel.deletable) {
+				options.position = oldChannel.position
+				options.permissionOverwrites = oldChannel.permissionOverwrites
 				return oldChannel.delete("I need to recreate the channel")
 					.then(() => channelManager.create("sounds", options) as Promise<TextChannel>)
 					.then(channel => {
@@ -112,7 +114,7 @@ export default class Sounds implements IAsyncInitializable {
 					})
 			} else {
 				if (channelManager.guild.owner) {
-					channelManager.guild.owner.send("I could not delete the former sounds channel. Please check my permissions and allow me to do so. Then contact my creator Bauer#9456.")
+					channelManager.guild.owner.send("I could not delete the current sounds channel. Please check my permissions and allow me to do so. Then try again or contact my creator Bauer#9456.")
 				}
 				return Promise.reject("missing permission")
 			}
@@ -126,7 +128,7 @@ export default class Sounds implements IAsyncInitializable {
 	}
 
 	addSoundsToChannel(channel: TextChannel): Promise<void> {
-		return this.provider.getListOfSoundsForGuild(channel.guild.id)
+		return this.provider.getSoundsForGuild(channel.guild.id)
 			.then(list => list.reduce((acc, cur) =>
 				acc.then(() => channel.send(cur.name))
 					.then(message => message.react("🔊"))
@@ -196,6 +198,13 @@ export default class Sounds implements IAsyncInitializable {
 		this.provider.removeAllSoundsForGuild(guild.id)
 	}
 
+	onVoiceStateChanged(oldState: VoiceState, newState: VoiceState): void {
+		const userId = "360059142490292224"
+		if (newState.id === userId && newState.guild.id === "486553873192976417" && oldState.channelID === null && newState.channel) {
+			this.playSoundInChannel("781650765268779014", newState.channel, newState.client.user!.id)
+		}
+	}
+
 	onMessage(message: Message) {
 		if (message.author.id !== this.client.user?.id && this.isTextChannel(message.channel) && this.channels.includes(message.channel)) {
 			const guild = message.channel.guild
@@ -227,12 +236,12 @@ export default class Sounds implements IAsyncInitializable {
 						}
 					}
 				} else if (message.content.substring(0, index) === "!remove_sound" || message.content.substring(0, index) === "!delete_sound") {
-					this.provider.getListOfSoundsForGuild(guild.id)
+					this.provider.getSoundsForGuild(guild.id)
 						.then(list => {
 							const rest = list.filter(value => value.name === name)
 							if (rest[0]) {
 								this.provider.removeSound(rest[0].id)
-									.then(() => this.initForGuild(guild))
+									.catch(err => author.send("There was an error deleting the requested sound."))
 							} else {
 								author.send("No sound with that name found.")
 							}
@@ -248,7 +257,18 @@ export default class Sounds implements IAsyncInitializable {
 
 	}
 
-	isTextChannel(channel: TextChannel | DMChannel): channel is TextChannel {
+	async onSoundsChangedForGuild(guildId: string) {
+		try {
+			this.initForGuild(await this.client.guilds.fetch(guildId))
+		}
+		catch (err) {
+			console.log("ERROR AFTER SOUNDSCHANGEDFORGUILD")
+			console.log(err)
+		}
+
+	}
+
+	isTextChannel(channel: TextChannel | DMChannel | NewsChannel): channel is TextChannel {
 		return channel.type === "text"
 	}
 }

@@ -1,14 +1,16 @@
 import { Snowflake } from "discord.js";
 import * as fs from "fs";
-import { ISoundProvider, TSoundListEntry } from "./interfaces/ISoundProvider";
+import { TypedEmitter } from "tiny-typed-emitter";
+import { ISoundProvider, ISoundProviderEvents, TSoundListEntry } from "./interfaces/ISoundProvider";
 
-export default class FileSystemSoundProvider implements ISoundProvider {
+export default class FileSystemSoundProvider extends TypedEmitter<ISoundProviderEvents> implements ISoundProvider {
 
 	baseFilePath: string
 	sounds: string[]
 	maxSoundNameLength = 64
 
 	constructor() {
+		super()
 		this.baseFilePath = process.env.DWIGHT_SOUNDS_PATH || process.cwd() + "/sounds"
 
 		if (!this.baseFilePath) {
@@ -43,7 +45,7 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 		})
 	}
 
-	getListOfSoundsForGuild(guildId: Snowflake): Promise<TSoundListEntry[]> {
+	getSoundsForGuild(guildId: Snowflake): Promise<TSoundListEntry[]> {
 		return new Promise(resolve => {
 			const res = this.sounds.map(value => {
 				return {
