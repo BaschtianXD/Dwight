@@ -138,7 +138,7 @@ export default class Sounds implements IAsyncInitializable {
 						return new Promise(resolve => {
 							this.messages.set(reaction.message.id, cur.id)
 							// Set timeout so we dont hit the rate limit
-							setTimeout(() => resolve(), 250)
+							setTimeout(() => resolve(), 500)
 						})
 					}), Promise.resolve()))
 			.catch(reason => {
