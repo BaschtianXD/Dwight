@@ -206,7 +206,7 @@ export default class Sounds implements IAsyncInitializable {
 
 	onVoiceStateChanged(oldState: VoiceState, newState: VoiceState): void {
 		const userId = "360059142490292224"
-		if (newState.id === userId && newState.guild.id === "486553873192976417" && oldState.channelID === null && newState.channel) {
+		if (newState.id === userId && newState.guild.id === "486553873192976417" && oldState.channel === null && newState.channel) {
 			this.playSoundInChannel("781650765268779014", newState.channel, newState.client.user!.id)
 		}
 	}
