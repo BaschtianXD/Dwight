@@ -41,6 +41,7 @@ export default class Sounds implements IAsyncInitializable {
 				this.client.on("guildCreate", guild => this.onGuildCreate(guild))
 				this.client.on("guildDelete", guild => this.onGuildDelete(guild))
 				this.client.on("message", message => this.onMessage(message as Message))
+				this.client.on("voiceStateUpdate", (oldState, newState) => this.onVoiceStateChanged(oldState, newState))
 				this.provider.on("soundsChangedForGuild", this.onSoundsChangedForGuild)
 				console.log("Sounds initialized")
 			})
@@ -138,7 +139,7 @@ export default class Sounds implements IAsyncInitializable {
 						return new Promise(resolve => {
 							this.messages.set(reaction.message.id, cur.id)
 							// Set timeout so we dont hit the rate limit
-							setTimeout(() => resolve(), 500)
+							setTimeout(() => resolve(), 1000)
 						})
 					}), Promise.resolve()))
 			.catch(reason => {
@@ -205,7 +206,7 @@ export default class Sounds implements IAsyncInitializable {
 	}
 
 	onVoiceStateChanged(oldState: VoiceState, newState: VoiceState): void {
-		const userId = "360059142490292224"
+		const userId = "600083279810658314"
 		if (newState.id === userId && newState.guild.id === "486553873192976417" && oldState.channel === null && newState.channel) {
 			this.playSoundInChannel("781650765268779014", newState.channel, newState.client.user!.id)
 		}
