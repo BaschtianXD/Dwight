@@ -58,7 +58,7 @@ export default class Sounds implements IAsyncInitializable {
 			throw new Error("no user available. log in first!")
 		}
 		// check if channel actually needs to be rebuild or if force === true
-		if (force === false && !this.needsRebuild.has(guild)) {
+		if (!force && !this.needsRebuild.has(guild)) {
 			return Promise.resolve()
 		}
 		const channelManager = guild.channels
@@ -73,7 +73,7 @@ export default class Sounds implements IAsyncInitializable {
 	createChannel(channelManager: GuildChannelManager, userId: Snowflake): Promise<TextChannel> {
 		const options: GuildCreateChannelOptions = {
 			type: "text",
-			topic: "Here are the sounds you can play. Press the reaction of a sound to play it in your voice channel. Send '!add_sound soundname' with a soundfile (mp3, max 200kb) attached to this channel to add a sound and send '!remove_sound soundname' to this channel to remove a sound.",
+			topic: "Here are the sounds you can play. Press the reaction of a sound to play it in your voice channel. Send '!help' to this channel to get a list of commands.",
 			permissionOverwrites: [
 				{
 					id: channelManager.guild.id,
@@ -114,7 +114,7 @@ export default class Sounds implements IAsyncInitializable {
 
 	addSoundsToChannel(channel: TextChannel): Promise<void> {
 		return this.provider.getSoundsForGuild(channel.guild.id)
-			.then(list => list.reduce((acc, cur) =>
+			.then(list => list.filter(sound => !sound.hidden).reduce((acc, cur) =>
 				acc.then(() => {
 					return channel.send(cur.name)
 				})
