@@ -1,18 +1,38 @@
-import { ISoundProvider, ISoundProviderEvents, TSoundListEntry } from "./interfaces/ISoundProvider";
+import { ISoundProvider, TEntreeListEntry, TSoundListEntry, ErrorTypes } from "./interfaces/ISoundProvider";
 import * as db from "./db"
 import { Snowflake, SnowflakeUtil } from "discord.js";
 import * as fs from "fs"
 import Axios from "axios";
-import { TypedEmitter } from "tiny-typed-emitter";
 
-export default class PgSoundProvider extends TypedEmitter<ISoundProviderEvents> implements ISoundProvider {
+export default class PgSoundProvider implements ISoundProvider {
 
 	basePath = process.env.DWIGHT_SOUNDS_PATH!
 	maxSoundNameLength = 64
 	defaultSoundLimit = 20
 
-	constructor() {
-		super()
+
+	getEntreeSoundIdForGuildUser(guildId: string, userId: string): Promise<string | undefined> {
+		return db.query<{ soundid: string }>("SELECT soundid FROM sounds.entrees WHERE guildID = $1 AND userID = $2;", [guildId, userId])
+			.then(qRes => {
+				if (qRes.rowCount === 1) {
+					return qRes.rows[0].soundid
+				}
+			})
+	}
+
+	addEntree(guildId: string, userId: string, soundId: string): Promise<void> {
+		return db.query("INSERT INTO sounds.entrees ($1, $2, $3) ON CONFLICT (guildID, userID) DO UPDATE SET soundID = $3;", [guildId, userId, soundId])
+			.then()
+	}
+	removeEntree(guildId: string, userId: string): Promise<void> {
+		return db.query("DELETE FROM sounds.entrees WHERE guildID = $1 AND userID = $2;", [guildId, userId])
+			.then()
+	}
+	getEntreesForGuild(guildId: string): Promise<TEntreeListEntry[]> {
+		return db.query<{ userid: string, soundname: string }>("SELECT userid, soundname FROM sounds.entrees NATURAL JOIN sounds.sounds WHERE guildID = $1;", [guildId])
+			.then(qResult => {
+				return qResult.rows.map(row => { return { userId: row.userid, soundName: row.soundname } })
+			})
 	}
 
 
@@ -21,12 +41,13 @@ export default class PgSoundProvider extends TypedEmitter<ISoundProviderEvents> 
 	}
 
 	getSoundsForGuild(guildId: string): Promise<TSoundListEntry[]> {
-		return db.query<{ soundid: string, soundname: string }>("SELECT soundID, soundname FROM sounds.sounds WHERE guildID = $1 ORDER BY soundname ASC", [guildId])
+		return db.query<{ soundid: string, soundname: string, hidden: boolean }>("SELECT soundID, soundname, hidden FROM sounds.sounds WHERE guildID = $1 AND deleted = false ORDER BY soundname ASC", [guildId])
 			.then(result => {
 				const res = result.rows.map(value => {
 					return {
 						id: value.soundid,
-						name: value.soundname
+						name: value.soundname,
+						hidden: value.hidden
 					}
 				})
 				return res
@@ -37,37 +58,34 @@ export default class PgSoundProvider extends TypedEmitter<ISoundProviderEvents> 
 		return new Promise(resolve => resolve(this.basePath + "/" + soundId + ".mp3"))
 	}
 
-	addSoundForGuild(guildId: string, url: string, name: string): Promise<void> {
+	addSoundForGuild(guildId: string, url: string, name: string, hidden: boolean): Promise<void> {
 		const id = SnowflakeUtil.generate()
 		return Promise.all([this.getAmountOfSounds(guildId), this.getLimitForGuild(guildId)])
-			.then(([numSounds, limit]) => new Promise((resolve, reject) => numSounds >= limit ? reject("Limit reached") : resolve()))
+			.then(([numSounds, limit]) => new Promise<void>((resolve, reject) => numSounds >= limit ? reject("Limit reached") : resolve()))
 			.then(() => this.download(url, this.basePath + "/" + id + ".mp3"))
-			.then(() => db.query("INSERT INTO sounds.sounds VALUES ($1, $2, $3)", [id, guildId, name]))
-			.then(() => { db.getDbSubscriber().notify("sounds.sounds", { guildId: guildId }) })
+			.then(() => db.query("INSERT INTO sounds.sounds VALUES ($1, $2, $3, $4)", [id, guildId, name, String(hidden)]))
 			.then(() => Promise.resolve())
 	}
 
 	removeSound(soundId: string): Promise<void> {
-		return db.query<{ guildid: string }>("DELETE FROM sounds.sounds WHERE soundid = $1 RETURNING guildid;", [soundId])
-			.then(qRes => {
-				if (qRes.rowCount > 0) {
-					db.getDbSubscriber().notify("sounds.sounds", { guildId: qRes.rows[0].guildid })
+		return db.query("UPDDATE sounds.sounds SET deleted = true WHERE soundid = $1", [soundId])
+			.then(_ => { })
+			.catch(err => {
+				if (err.code === "23503") {
+					return Promise.reject(ErrorTypes.soundUsed)
+				} else {
+					return Promise.reject(err)
 				}
 			})
-			.then(() => this.getPathToSound(soundId))
-			.then(path => fs.promises.unlink(path))
 	}
 
 	removeAllSoundsForGuild(guildId: string): Promise<void> {
-		return db.query<{ soundid: string, guildid: string, soundname: string }>("DELETE FROM sounds.sounds WHERE guildID = $1 RETURNING *", [guildId])
-			.then(queryresult => Promise.all(queryresult.rows.map(value => this.getPathToSound(value.soundid))))
-			.then(paths => Promise.all(paths.map(value => fs.promises.unlink(value))))
-			.then(_ => { db.getDbSubscriber().notify("sounds.sounds", { guildId: guildId }) })
+		return db.query("UPDATE sounds.sounds WHERE guildID = $1;", [guildId])
 			.then(() => Promise.resolve())
 	}
 
 	getAmountOfSounds(guildId: string): Promise<number> {
-		return db.query<{ count: string }>("SELECT count(*) FROM sounds.sounds WHERE guildID = $1", [guildId])
+		return db.query<{ count: string }>("SELECT count(*) FROM sounds.sounds WHERE guildID = $1 AND deleted = false", [guildId])
 			.then(qresult => parseInt(qresult.rows[0].count))
 	}
 
@@ -89,17 +107,12 @@ export default class PgSoundProvider extends TypedEmitter<ISoundProviderEvents> 
 			.catch(reason => console.log(Date.now() + ": " + reason))
 	}
 
-	onSoundsChange(payload: { guildid: string }) {
-		this.emit("soundsChangedForGuild", payload.guildid)
-	}
-
 	private prepareDatabase() {
-		db.getDbSubscriber().notifications.on("sounds.sounds", this.onSoundsChange)
 		return db.query("CREATE SCHEMA IF NOT EXISTS sounds;")
-			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.sounds ( soundID BIGINT PRIMARY KEY, guildID BIGINT NOT NULL, soundname VARCHAR(64) NOT NULL);"))
+			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.sounds ( soundID BIGINT PRIMARY KEY, guildID BIGINT NOT NULL, soundname VARCHAR(64) NOT NULL, hidden BOOLEAN NOT NULL DEFAULT false, deleted BOOLEAN NOT NULL DEFAULT false);"))
 			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.limits ( guildID BIGINT PRIMARY KEY, maxsounds SMALLINT NOT NULL);"))
+			.then(_ => db.query("CREATE TABLE IF NOT EXISTS sounds.entrees ( guildID BIGINT, userID BIGINT, soundID BIGINT REFERENCES sounds.sounds, PRIMARY KEY (guildID, userID) );"))
 			.then(_ => { db.query("CREATE TABLE IF NOT EXISTS sounds.plays ( userID BIGINT NOT NULL, soundID BIGINT NOT NULL, time TIMESTAMPTZ NOT NULL);") })
-			.then(_ => { db.getDbSubscriber().listenTo("sounds.sounds") })
 			.catch(reason => {
 				throw new Error("DB ERROR - Setup: " + reason)
 			})
@@ -126,6 +139,8 @@ TABLE: sounds.sounds:
 		- soundid: bigint primary key (snowflake)
 		- guildid: biging (snowflake)
 		- soundname: varchar(this.maxSoundNameLength)
+		- hidden: boolean (default false)
+		- deleted: boolean (default false)
 TABLE: sounds.limits:
 	FIELDS:
 		- guildid: bigint primary key (snowflake)
@@ -135,6 +150,10 @@ TABLE: sounds.plays:
 		- userid: bigint (snowflake)
 		- soundid: bigint (snowflake)
 		- time: timestamp
-
+TABLE: sounds.entrees:
+	FIELDS:
+		- guildid: bigint primary key
+		- userid: bigint primary key
+		- soundid: bigint foreign key to sounds.sounds
 
 */

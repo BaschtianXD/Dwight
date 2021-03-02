@@ -1,16 +1,14 @@
 import { Snowflake } from "discord.js";
 import * as fs from "fs";
-import { TypedEmitter } from "tiny-typed-emitter";
-import { ISoundProvider, ISoundProviderEvents, TSoundListEntry } from "./interfaces/ISoundProvider";
+import { ISoundProvider, TEntreeListEntry, TSoundListEntry } from "./interfaces/ISoundProvider";
 
-export default class FileSystemSoundProvider extends TypedEmitter<ISoundProviderEvents> implements ISoundProvider {
+export default class FileSystemSoundProvider implements ISoundProvider {
 
 	baseFilePath: string
 	sounds: string[]
 	maxSoundNameLength = 64
 
 	constructor() {
-		super()
 		this.baseFilePath = process.env.DWIGHT_SOUNDS_PATH || process.cwd() + "/sounds"
 
 		if (!this.baseFilePath) {
@@ -24,6 +22,18 @@ export default class FileSystemSoundProvider extends TypedEmitter<ISoundProvider
 			console.log("Could not read filepath: " + this.baseFilePath)
 			return
 		}
+	}
+	getEntreeSoundIdForGuildUser(guildId: string, userId: string): Promise<string | undefined> {
+		return Promise.resolve(undefined)
+	}
+	addEntree(guildId: string, userId: string, soundId: string): Promise<void> {
+		return Promise.resolve()
+	}
+	removeEntree(guildId: string, userId: string): Promise<void> {
+		return Promise.resolve()
+	}
+	getEntreesForGuild(guildId: string): Promise<TEntreeListEntry[]> {
+		return Promise.resolve([])
 	}
 	soundPlayed(userId: string, soundId: string): Promise<void> {
 		return Promise.resolve()
@@ -50,7 +60,8 @@ export default class FileSystemSoundProvider extends TypedEmitter<ISoundProvider
 			const res = this.sounds.map(value => {
 				return {
 					id: value,
-					name: value
+					name: value,
+					hidden: false
 				}
 			})
 			resolve(res)

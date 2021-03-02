@@ -1,13 +1,8 @@
 import { Snowflake } from "discord.js";
 import { EventEmitter } from "events";
 import IAsyncInitializable from "./IAsyncInitializable";
-import { TypedEmitter } from 'tiny-typed-emitter';
 
-export interface ISoundProviderEvents {
-	"soundsChangedForGuild": (guildId: string) => void
-}
-
-export interface ISoundProvider extends IAsyncInitializable, TypedEmitter<ISoundProviderEvents> {
+export interface ISoundProvider extends IAsyncInitializable {
 
 	maxSoundNameLength: number
 
@@ -30,9 +25,10 @@ export interface ISoundProvider extends IAsyncInitializable, TypedEmitter<ISound
 	 * @param guildId Id of the guild
 	 * @param url URL to the sound
 	 * @param name Name of the sound
+	 * @param hidden Set to true if the sound should not appear in the sounds channel
 	 * @returns A promise for chaining
 	 */
-	addSoundForGuild(guildId: Snowflake, url: string, name: string): Promise<void>
+	addSoundForGuild(guildId: Snowflake, url: string, name: string, hidden: boolean): Promise<void>
 
 	/**
 	 * 
@@ -42,11 +38,42 @@ export interface ISoundProvider extends IAsyncInitializable, TypedEmitter<ISound
 	removeSound(soundId: Snowflake): Promise<void>
 
 	/**
-	 * 
+	 * Remove all sounds for a specified guild
 	 * @param guildId Id of the guild
 	 * @returns A promise for chaining
 	 */
 	removeAllSoundsForGuild(guildId: Snowflake): Promise<void>
+
+	/**
+	 * 
+	 * @param guildId Id of the guild
+	 * @param userId Id of the user
+	 * @param soundId Id of the sound
+	 * @returns A promise for chaining
+	 */
+	addEntree(guildId: Snowflake, userId: Snowflake, soundId: Snowflake): Promise<void>
+
+	/**
+	 * 
+	 * @param guildId Id of the guild
+	 * @param userId Id of the user
+	 * @returns A promise for chaining
+	 */
+	removeEntree(guildId: Snowflake, userId: Snowflake): Promise<void>
+
+	/**
+	 * 
+	 * @param guildId Id of the guildd
+	 * @returns A promise with an array of entrees
+	 */
+	getEntreesForGuild(guildId: Snowflake): Promise<TEntreeListEntry[]>
+
+	/**
+	 * 
+	 * @param guildId Id of the guild
+	 * @param userId Id of the user
+	 */
+	getEntreeSoundIdForGuildUser(guildId: Snowflake, userId: Snowflake): Promise<Snowflake | undefined>
 
 	/**
 	 * 
@@ -73,5 +100,15 @@ export interface ISoundProvider extends IAsyncInitializable, TypedEmitter<ISound
 
 export type TSoundListEntry = {
 	id: Snowflake,
-	name: string
+	name: string,
+	hidden: boolean
+}
+
+export type TEntreeListEntry = {
+	userId: Snowflake,
+	soundName: string
+}
+
+export enum ErrorTypes {
+	soundUsed
 }
