@@ -344,8 +344,11 @@ export default class Sounds implements IAsyncInitializable {
 		const guild = message.channel.guild
 		this.provider.addSoundForGuild(guild.id, attachment.url, name, hidden)
 			.then(() => {
-				this.needsRebuild.add(guild)
-				message.author.send("Added " + name + " to " + guild.name + ".\nUse `!rebuild` in the sound channel to rebuild the channel once all changes are applied.")
+				if (!hidden) {
+					this.needsRebuild.add(guild)
+					message.author.send("Added " + name + " to " + guild.name + ".\nUse `!rebuild` in the sound channel to rebuild the channel once all changes are applied.")
+				}
+
 			})
 			.catch(reason => {
 				if (reason === "limit reached") {
@@ -411,7 +414,7 @@ export default class Sounds implements IAsyncInitializable {
 	sendHelp(message: Message) {
 		const help = [
 			"I offer the follwing commands:",
-			"\t- `!add_sound [--hidden|-h] soundname` adds the sound with the given name",
+			"\t- `!add_sound [--hidden|-h] soundname` adds the sound with the given name", // TODO explain hidden
 			"\t- `!remove_sound soundname` removes the sound with the given name",
 			"\t- `!get_sounds` sends you a list of all sounds on this server",
 			"\t- `!add_entree soundname @user [@user ...]` adds an entree with the given soundname to the mentioned user(s)",
