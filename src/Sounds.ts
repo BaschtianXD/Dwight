@@ -196,8 +196,8 @@ export default class Sounds implements IAsyncInitializable {
 	}
 
 	onVoiceStateChanged(oldState: VoiceState, newState: VoiceState): void {
-		if (oldState.channel || !newState.member || !newState.channel) return
-		this.provider.getEntreeSoundIdForGuildUser(newState.guild.id, newState.member.guild.id)
+		if (oldState.member?.id === oldState.client.user?.id || oldState.channel || !newState.member || !newState.channel) return
+		this.provider.getEntreeSoundIdForGuildUser(newState.guild.id, newState.member.id)
 			.then(soundId => {
 				if (!soundId || !newState.channel) {
 					return
