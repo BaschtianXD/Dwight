@@ -277,7 +277,7 @@ export default class Sounds implements IAsyncInitializable {
 			message.author.send("You need to mention users to add entree for." + genericHelp)
 			return
 		}
-		const soundName = tokens.filter(value => !value.startsWith("@")).join(" ")
+		const soundName = tokens.filter(value => !value.startsWith("<@")).join(" ")
 		if (soundName === "") {
 			message.author.send("You need to add the name of the sound to use as entree. Use `!get_sounds` to see all sounds.")
 			return
@@ -403,7 +403,7 @@ export default class Sounds implements IAsyncInitializable {
 			.then(sounds => {
 				var mess = "Sounds for server " + guild.name + ":"
 				sounds.forEach(sound => {
-					mess += "\n" + (sound.hidden ? "*" : "") + sound.name + (sound.hidden ? "*" : "")
+					mess += "\n- " + (sound.hidden ? "*" : "") + sound.name + (sound.hidden ? "*" : "")
 				})
 				mess += "\nThere are " + sounds.length + " sounds on this server."
 				mess += "\nCursive sounds are hidden."
@@ -423,17 +423,6 @@ export default class Sounds implements IAsyncInitializable {
 			"\t- `!help` send this message again"
 		]
 		message.author.send(help.join("\n"))
-	}
-
-	async onSoundsChangedForGuild(guildId: string) {
-		try {
-			this.initForGuild(await this.client.guilds.fetch(guildId))
-		}
-		catch (err) {
-			console.log("ERROR AFTER SOUNDSCHANGEDFORGUILD")
-			console.log(err)
-		}
-
 	}
 
 	isTextChannel(channel: TextChannel | DMChannel | NewsChannel): channel is TextChannel {
