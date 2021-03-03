@@ -63,10 +63,13 @@ export default class Sounds implements IAsyncInitializable {
 		}
 		const channelManager = guild.channels
 		return this.createChannel(channelManager, this.client.user.id)
-			.then(_ => this.addSoundsToChannel.bind(this))
+			.then(channel => {
+				this.addSoundsToChannel(channel)
+			})
 			.catch(reason => {
 				console.error(new Date() + ": " + reason)
 				console.trace()
+				return Promise.reject()
 			})
 	}
 
@@ -114,18 +117,21 @@ export default class Sounds implements IAsyncInitializable {
 
 	addSoundsToChannel(channel: TextChannel): Promise<void> {
 		return this.provider.getSoundsForGuild(channel.guild.id)
-			.then(list => list.filter(sound => !sound.hidden).reduce((acc, cur) =>
-				acc.then(() => {
-					return channel.send(cur.name)
-				})
-					.then(message => message.react("🔊"))
-					.then(reaction => {
-						return new Promise(resolve => {
-							this.messages.set(reaction.message.id, cur.id)
-							// Set timeout so we dont hit the discord api rate limit
-							setTimeout(() => resolve(), 1000)
-						})
-					}), Promise.resolve()))
+			.then(list => {
+				console.log(list[0])
+				list.filter(sound => !sound.hidden).reduce((acc, cur) =>
+					acc.then(() => {
+						return channel.send(cur.name)
+					})
+						.then(message => message.react("🔊"))
+						.then(reaction => {
+							return new Promise(resolve => {
+								this.messages.set(reaction.message.id, cur.id)
+								// Set timeout so we dont hit the discord api rate limit
+								setTimeout(() => resolve(), 1000)
+							})
+						}), Promise.resolve())
+			})
 			.catch(reason => {
 				console.error(new Date() + ": " + reason)
 				console.trace()
