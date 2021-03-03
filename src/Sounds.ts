@@ -118,7 +118,6 @@ export default class Sounds implements IAsyncInitializable {
 	addSoundsToChannel(channel: TextChannel): Promise<void> {
 		return this.provider.getSoundsForGuild(channel.guild.id)
 			.then(list => {
-				console.log(list[0])
 				list.filter(sound => !sound.hidden).reduce((acc, cur) =>
 					acc.then(() => {
 						return channel.send(cur.name)
@@ -405,6 +404,7 @@ export default class Sounds implements IAsyncInitializable {
 				})
 				mess += "\nThere are " + sounds.length + " sounds on this server."
 				mess += "\nCursive sounds are hidden."
+				message.author.send(mess)
 			})
 	}
 
@@ -413,6 +413,7 @@ export default class Sounds implements IAsyncInitializable {
 			"I offer the follwing commands:",
 			"\t- `!add_sound [--hidden|-h] soundname` adds the sound with the given name",
 			"\t- `!remove_sound soundname` removes the sound with the given name",
+			"\t- `!get_sounds` sends you a list of all sounds on this server",
 			"\t- `!add_entree soundname @user [@user ...]` adds an entree with the given soundname to the mentioned user(s)",
 			"\t- `!remove_entree @user [@user ...]` removes the entree sound(s) for the given user(s)",
 			"\t- `!rebuild` rebuild the sound channel if there are pending changes",
