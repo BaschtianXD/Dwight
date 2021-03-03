@@ -21,7 +21,7 @@ export default class PgSoundProvider implements ISoundProvider {
 	}
 
 	addEntree(guildId: string, userId: string, soundId: string): Promise<void> {
-		return db.query("INSERT INTO sounds.entrees ($1, $2, $3) ON CONFLICT (guildID, userID) DO UPDATE SET soundID = $3;", [guildId, userId, soundId])
+		return db.query("INSERT INTO sounds.entrees VALUES ($1, $2, $3) ON CONFLICT (guildID, userID) DO UPDATE SET soundID = $3;", [guildId, userId, soundId])
 			.then()
 	}
 	removeEntree(guildId: string, userId: string): Promise<void> {
@@ -41,7 +41,7 @@ export default class PgSoundProvider implements ISoundProvider {
 	}
 
 	getSoundsForGuild(guildId: string): Promise<TSoundListEntry[]> {
-		return db.query<{ soundid: string, soundname: string, hidden: boolean }>("SELECT soundID, soundname, hidden FROM sounds.sounds WHERE guildID = $1 AND deleted = false ORDER BY soundname ASC", [guildId])
+		return db.query<{ soundid: string, soundname: string, hidden: boolean }>("SELECT soundID, soundname, hidden FROM sounds.sounds WHERE guildid = $1 AND deleted = false ORDER BY soundname ASC", [guildId])
 			.then(result => {
 				const res = result.rows.map(value => {
 					return {
