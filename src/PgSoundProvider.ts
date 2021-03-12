@@ -68,7 +68,7 @@ export default class PgSoundProvider implements ISoundProvider {
 	}
 
 	removeSound(soundId: string): Promise<void> {
-		return db.query("UPDDATE sounds.sounds SET deleted = true WHERE soundid = $1;", [soundId])
+		return db.query("UPDATE sounds.sounds SET deleted = true WHERE soundid = $1;", [soundId])
 			.then(_ => { })
 			.catch(err => {
 				if (err.code === "23503") {
