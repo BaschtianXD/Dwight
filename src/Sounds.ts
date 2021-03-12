@@ -387,6 +387,8 @@ export default class Sounds implements IAsyncInitializable {
 								return
 							}
 							message.author.send("There was an error deleting the requested sound.")
+							console.error(Date.now() + ": " + JSON.stringify(err))
+							console.trace()
 						})
 				} else {
 					message.author.send("No sound with that name found. Use `!get_sounds` to see all sounds.")
