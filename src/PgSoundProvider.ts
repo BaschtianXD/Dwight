@@ -41,7 +41,7 @@ export default class PgSoundProvider implements ISoundProvider {
 	}
 
 	getSoundsForGuild(guildId: string): Promise<TSoundListEntry[]> {
-		return db.query<{ soundid: string, soundname: string, hidden: boolean }>("SELECT soundID, soundname, hidden FROM sounds.sounds WHERE guildid = $1 AND deleted = false ORDER BY soundname ASC", [guildId])
+		return db.query<{ soundid: string, soundname: string, hidden: boolean }>("SELECT soundID, soundname, hidden FROM sounds.sounds WHERE guildid = $1 AND deleted = false ORDER BY soundname ASC;", [guildId])
 			.then(result => {
 				const res = result.rows.map(value => {
 					return {
@@ -63,12 +63,12 @@ export default class PgSoundProvider implements ISoundProvider {
 		return Promise.all([this.getAmountOfSounds(guildId), this.getLimitForGuild(guildId)])
 			.then(([numSounds, limit]) => new Promise<void>((resolve, reject) => numSounds >= limit ? reject("Limit reached") : resolve()))
 			.then(() => this.download(url, this.basePath + "/" + id + ".mp3"))
-			.then(() => db.query("INSERT INTO sounds.sounds VALUES ($1, $2, $3, $4)", [id, guildId, name, String(hidden)]))
+			.then(() => db.query("INSERT INTO sounds.sounds VALUES ($1, $2, $3, $4);", [id, guildId, name, String(hidden)]))
 			.then(() => Promise.resolve())
 	}
 
 	removeSound(soundId: string): Promise<void> {
-		return db.query("UPDDATE sounds.sounds SET deleted = true WHERE soundid = $1", [soundId])
+		return db.query("UPDDATE sounds.sounds SET deleted = true WHERE soundid = $1;", [soundId])
 			.then(_ => { })
 			.catch(err => {
 				if (err.code === "23503") {
