@@ -1,4 +1,4 @@
-import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, DMChannel, NewsChannel, VoiceState } from "discord.js";
+import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, DMChannel, NewsChannel, VoiceState, GuildChannel } from "discord.js";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ErrorTypes, ISoundProvider } from "./interfaces/ISoundProvider";
 import PgSoundProvider from "./PgSoundProvider";
@@ -52,7 +52,7 @@ export default class Sounds implements IAsyncInitializable {
 			})
 	}
 
-	initForGuild(guild: Guild, force: boolean = false): Promise<void> {
+	async initForGuild(guild: Guild, force: boolean = false) {
 		if (!this.client.user) {
 			// Typescript cleanup
 			throw new Error("no user available. log in first!")
@@ -61,16 +61,19 @@ export default class Sounds implements IAsyncInitializable {
 		if (!force && !this.needsRebuild.has(guild)) {
 			return Promise.resolve()
 		}
-		const channelManager = guild.channels
-		return this.createChannel(channelManager, this.client.user.id)
-			.then(channel => {
-				this.addSoundsToChannel(channel)
-			})
-			.catch(reason => {
-				console.error(new Date() + ": " + reason)
-				console.trace()
-				return Promise.reject()
-			})
+		if (!await this.checkChannel(guild)) {
+			const channelManager = guild.channels
+			return this.createChannel(channelManager, this.client.user.id)
+				.then(channel => {
+					this.addSoundsToChannel(channel)
+				})
+				.catch(reason => {
+					console.error(new Date() + ": " + reason)
+					console.trace()
+					return Promise.reject()
+				})
+		}
+
 	}
 
 	createChannel(channelManager: GuildChannelManager, userId: Snowflake): Promise<TextChannel> {
@@ -427,7 +430,44 @@ export default class Sounds implements IAsyncInitializable {
 		message.author.send(help.join("\n"))
 	}
 
-	isTextChannel(channel: TextChannel | DMChannel | NewsChannel): channel is TextChannel {
+	/**
+	 * Checks whether a guild has an already build sound channel
+	 */
+	async checkChannel(guild: Guild): Promise<boolean> {
+		const channel = guild.channels.cache.find(guildchannel => guildchannel.name === "sounds")
+		if (!channel || !this.isTextChannel(channel)) return Promise.resolve(false)
+		var messages = await this.loadMessages(channel)
+		messages.reverse()
+		const sounds = await this.provider.getSoundsForGuild(guild.id)
+		const filteredSounds = sounds.filter(sound => !sound.hidden)
+		if (messages.length !== filteredSounds.length) return false
+		for (var i = 0; i < messages.length; i++) {
+			if (messages[i].content !== filteredSounds[i].name) return false
+
+		}
+		for (var i = 0; i < messages.length; i++) {
+			await messages[i].react("🔊")
+			this.messages.set(messages[i].id, filteredSounds[i].id)
+		}
+		this.channels.push(channel)
+
+		return true
+	}
+
+	async loadMessages(channel: TextChannel): Promise<Message[]> {
+		var count = 50
+		var messages: Message[] = []
+		var before: Snowflake | undefined
+		var size = 0
+		do {
+			const msgCollection = await channel.messages.fetch({ limit: count, before })
+			size = msgCollection.size
+			messages.push(...msgCollection.values())
+		} while (size === count)
+		return messages
+	}
+
+	isTextChannel(channel: TextChannel | DMChannel | NewsChannel | GuildChannel): channel is TextChannel {
 		return channel.type === "text"
 	}
 }
