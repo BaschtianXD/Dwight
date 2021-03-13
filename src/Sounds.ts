@@ -45,21 +45,17 @@ export default class Sounds implements IAsyncInitializable {
 
 	onReady(client: Client) {
 		const guilds = Array.from(client.guilds.cache.values())
-		guilds.reduce((acc, cur) => acc.then(() => this.initForGuild(cur, true)), Promise.resolve())
+		guilds.reduce((acc, cur) => acc.then(() => this.initForGuild(cur)), Promise.resolve())
 			.catch(reason => {
 				console.error(new Date() + ": " + reason)
 				console.trace()
 			})
 	}
 
-	async initForGuild(guild: Guild, force: boolean = false) {
+	async initForGuild(guild: Guild) {
 		if (!this.client.user) {
 			// Typescript cleanup
 			throw new Error("no user available. log in first!")
-		}
-		// check if channel actually needs to be rebuild or if force === true
-		if (!force && !this.needsRebuild.has(guild)) {
-			return Promise.resolve()
 		}
 		if (!await this.checkChannel(guild)) {
 			const channelManager = guild.channels
