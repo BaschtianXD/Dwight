@@ -190,7 +190,7 @@ export default class Sounds implements IAsyncInitializable {
 
 
 	onGuildDelete(guild: Guild): void {
-		this.provider.removeAllSoundsForGuild(guild.id)
+		this.provider.removeAllDataForGuild(guild.id)
 	}
 
 	onVoiceStateChanged(oldState: VoiceState, newState: VoiceState): void {

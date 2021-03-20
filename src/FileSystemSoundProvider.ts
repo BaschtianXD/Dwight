@@ -2,6 +2,10 @@ import { Snowflake } from "discord.js";
 import * as fs from "fs";
 import { ISoundProvider, TEntreeListEntry, TSoundListEntry } from "./interfaces/ISoundProvider";
 
+/**
+ * # This class is not meant to be used in production!
+ * It can be used for testing while not requiring a database.
+ */
 export default class FileSystemSoundProvider implements ISoundProvider {
 
 	baseFilePath: string
@@ -82,7 +86,7 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 		return new Promise((resolve, reject) => reject("not yet implemented"))
 	}
 
-	removeAllSoundsForGuild(guildId: Snowflake): Promise<void> {
+	removeAllDataForGuild(guildId: Snowflake): Promise<void> {
 		return new Promise((resolve, reject) => reject("not yet implemented"))
 	}
 

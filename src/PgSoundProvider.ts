@@ -79,8 +79,9 @@ export default class PgSoundProvider implements ISoundProvider {
 			})
 	}
 
-	removeAllSoundsForGuild(guildId: string): Promise<void> {
-		return db.query("UPDATE sounds.sounds WHERE guildID = $1;", [guildId])
+	removeAllDataForGuild(guildId: string): Promise<void> {
+		return db.query("DELETE FROM sounds.entrees WHERE guildID = $1", [guildId])
+			.then(() => db.query("UPDATE sounds.sounds SET deleted = true WHERE guildID = $1;", [guildId]))
 			.then(() => Promise.resolve())
 	}
 

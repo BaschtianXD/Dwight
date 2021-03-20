@@ -38,11 +38,11 @@ export interface ISoundProvider extends IAsyncInitializable {
 	removeSound(soundId: Snowflake): Promise<void>
 
 	/**
-	 * Remove all sounds for a specified guild
+	 * Remove all data for a specified guild
 	 * @param guildId Id of the guild
 	 * @returns A promise for chaining
 	 */
-	removeAllSoundsForGuild(guildId: Snowflake): Promise<void>
+	removeAllDataForGuild(guildId: Snowflake): Promise<void>
 
 	/**
 	 * 
