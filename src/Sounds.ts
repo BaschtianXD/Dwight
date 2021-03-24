@@ -450,8 +450,14 @@ export default class Sounds implements IAsyncInitializable {
 
 		}
 		for (var i = 0; i < messages.length; i++) {
-			await messages[i].react("🔊")
 			this.messages.set(messages[i].id, filteredSounds[i].id)
+			const arr = messages[i].reactions.cache.array()
+			if (arr.length !== 1 || arr[0].emoji.name !== "🔊" || arr[0].count !== 1 || !arr[0].me) {
+				await messages[i].reactions.removeAll()
+				await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
+				await messages[i].react("🔊")
+				await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
+			}
 		}
 		this.channels.push(channel)
 

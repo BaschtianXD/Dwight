@@ -9,6 +9,16 @@ import Sound from "./models/Sound";
 import * as fs from "fs"
 import Axios from "axios";
 
+const sequelize = new Sequelize({
+    dialect: process.env.DBDIALECT! as Dialect,
+    database: process.env.DBDATABASE,
+    models: [__dirname + '/models'],
+    username: process.env.DBUSER,
+    password: process.env.DBPASSWORD,
+    host: process.env.DBHOST,
+    logging: process.env.NODE_ENV === "DEVELOPMENT" ? console.log : false
+})
+
 export default class SequelizeSoundProvider implements ISoundProvider {
 
     maxSoundNameLength: number = 64;
@@ -18,14 +28,23 @@ export default class SequelizeSoundProvider implements ISoundProvider {
     async getSoundsForGuild(guildId: string): Promise<TSoundListEntry[]> {
         const result = await Sound.findAll({
             attributes: [
-                ["soundID", "id"], ["soundName", "name"], "hidden"
+                "soundID", "soundName", "hidden"
             ],
             where: {
                 guildID: guildId,
                 deleted: false
+            },
+            order: [
+                ["soundName", "ASC"]
+            ]
+        })
+        return result.map(row => {
+            return {
+                id: row.soundID,
+                name: row.soundName,
+                hidden: row.hidden
             }
         })
-        return result as unknown as TSoundListEntry[]
     }
 
     getPathToSound(soundId: string): Promise<string> {
@@ -144,7 +163,8 @@ export default class SequelizeSoundProvider implements ISoundProvider {
     }
 
     initialize(): Promise<void> {
-        return Promise.resolve()
+
+        return sequelize.sync().then()
     }
 
     private download(url: string, destination: string): Promise<void> {
@@ -159,12 +179,3 @@ export default class SequelizeSoundProvider implements ISoundProvider {
     }
 
 }
-
-const sequelize = new Sequelize({
-    dialect: process.env.DBDIALECT! as Dialect,
-    database: process.env.DBDATABASE,
-    models: [__dirname + '/models'],
-    username: process.env.DBUSER, // TODO anderer user anlegen und daten ändern
-    password: process.env.DBPASSWORD,
-    host: process.env.DBHOST
-})

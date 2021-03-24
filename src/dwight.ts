@@ -36,3 +36,4 @@ Promise.all([
 		console.log(Date.now() + ": " + reason)
 		process.exit(1)
 	})
+
