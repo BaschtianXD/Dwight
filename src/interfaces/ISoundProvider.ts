@@ -110,5 +110,6 @@ export type TEntreeListEntry = {
 }
 
 export enum ErrorTypes {
-	soundUsed
+	soundUsed,
+	limitReached
 }

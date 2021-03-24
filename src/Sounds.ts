@@ -1,7 +1,7 @@
 import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, DMChannel, NewsChannel, VoiceState, GuildChannel } from "discord.js";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ErrorTypes, ISoundProvider } from "./interfaces/ISoundProvider";
-import PgSoundProvider from "./PgSoundProvider";
+import SequelizeSoundProvider from "./SequelizeSoundProvider";
 
 export default class Sounds implements IAsyncInitializable {
 
@@ -26,7 +26,7 @@ export default class Sounds implements IAsyncInitializable {
 		this.channels = []
 		this.needsRebuild = new Set()
 
-		this.provider = new PgSoundProvider()
+		this.provider = new SequelizeSoundProvider()
 	}
 
 	initialize(): Promise<void> {
@@ -186,11 +186,19 @@ export default class Sounds implements IAsyncInitializable {
 
 	onGuildCreate(guild: Guild) {
 		this.initForGuild(guild)
+			.catch(error => {
+				console.error(new Date() + ": " + error)
+				console.trace()
+			})
 	}
 
 
 	onGuildDelete(guild: Guild): void {
 		this.provider.removeAllDataForGuild(guild.id)
+			.catch(error => {
+				console.error(new Date() + ": " + error)
+				console.trace()
+			})
 	}
 
 	onVoiceStateChanged(oldState: VoiceState, newState: VoiceState): void {
@@ -286,7 +294,7 @@ export default class Sounds implements IAsyncInitializable {
 			.then(sounds => {
 				const sound = sounds.find((value => value.name === soundName))
 				if (!sound) {
-					message.author.send("I can't find a sound that fits this name." + genericHelp)
+					message.author.send("I can't find a sound that fits this name. Use `!get_sounds` to see all sounds." + genericHelp)
 					return Promise.reject(13)
 				}
 				if (!message.mentions.members) return
@@ -350,7 +358,7 @@ export default class Sounds implements IAsyncInitializable {
 
 			})
 			.catch(reason => {
-				if (reason === "limit reached") {
+				if (reason === ErrorTypes.limitReached) {
 					message.author.send("You have already reached the maximum number of sounds." + genericHelp)
 					return
 				}

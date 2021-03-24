@@ -1,5 +1,5 @@
 import { ISoundProvider, TEntreeListEntry, TSoundListEntry, ErrorTypes } from "./interfaces/ISoundProvider";
-import * as db from "./db"
+import * as db from "./db/pg"
 import { Snowflake, SnowflakeUtil } from "discord.js";
 import * as fs from "fs"
 import Axios from "axios";

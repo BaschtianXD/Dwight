@@ -1,4 +1,5 @@
 import * as Discord from "discord.js"
+import SequelizeSoundProvider from "./SequelizeSoundProvider"
 import Sounds from "./Sounds"
 
 const client = new Discord.Client();
