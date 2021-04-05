@@ -1,5 +1,4 @@
 import { Snowflake } from "discord.js";
-import { EventEmitter } from "events";
 import IAsyncInitializable from "./IAsyncInitializable";
 
 export interface ISoundProvider extends IAsyncInitializable {
@@ -111,5 +110,6 @@ export type TEntreeListEntry = {
 
 export enum ErrorTypes {
 	soundUsed,
-	limitReached
+	limitReached,
+	duplicatedName
 }
