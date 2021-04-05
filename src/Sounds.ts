@@ -361,6 +361,8 @@ export default class Sounds implements IAsyncInitializable {
 				if (reason === ErrorTypes.limitReached) {
 					message.author.send("You have already reached the maximum number of sounds." + genericHelp)
 					return
+				} else if (reason === ErrorTypes.duplicatedName) {
+					message.author.send("This name is already in use. Either remove the old sound first or use another name.")
 				}
 				const date = Date.now()
 				message.author.send("There was an unexplained error, sorry. Please contact my developer Bauer#9456 with the follwing number: " + date)

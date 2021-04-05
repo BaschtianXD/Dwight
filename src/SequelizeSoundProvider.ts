@@ -53,10 +53,13 @@ export default class SequelizeSoundProvider implements ISoundProvider {
 
     async addSoundForGuild(guildId: string, url: string, name: string, hidden: boolean): Promise<void> {
         const id = SnowflakeUtil.generate()
-        const count = await Sound.count({ where: { guildID: guildId } })
+        const sounds = await Sound.findAll({ where: { guildID: guildId } })
         const limit = await this.getLimitForGuild(guildId)
-        if (count >= limit) {
+        if (sounds.length >= limit) {
             return Promise.reject(ErrorTypes.limitReached)
+        }
+        if (sounds.some(sound => sound.soundName === name)) {
+            return Promise.reject(ErrorTypes.duplicatedName)
         }
         this.download(url, this.basePath + "/" + id + ".mp3")
         return Sound.create({
