@@ -229,6 +229,9 @@ export default class Sounds implements IAsyncInitializable {
 				case "!get_sounds":
 					this.sendSoundsForGuild(message)
 					break
+				case "!rename_sound":
+					this.renameSound(tokens, message)
+					break
 				case "!add_entree":
 					this.addEntree(tokens, message)
 					break
@@ -312,7 +315,7 @@ export default class Sounds implements IAsyncInitializable {
 			})
 	}
 
-	addSoundToGuild(tokens: string[], message: Message) {
+	async addSoundToGuild(tokens: string[], message: Message) {
 		var hidden = false
 		const genericHelp = " Send `!help` to the sound channel for more informamtion."
 		if (tokens[0] === "--hidden" || tokens[0] === "-h") {
@@ -349,6 +352,10 @@ export default class Sounds implements IAsyncInitializable {
 			return // Typescript cleanup
 		}
 		const guild = message.channel.guild
+		const sounds = await this.provider.getSoundsForGuild(guild.id)
+		if (sounds.some(sound => sound.name === name)) {
+			message.author.send("This name is already in use. Either remove/rename the old sound first or use another name.")
+		}
 		this.provider.addSoundForGuild(guild.id, attachment.url, name, hidden)
 			.then(() => {
 				if (!hidden) {
@@ -405,6 +412,32 @@ export default class Sounds implements IAsyncInitializable {
 			})
 	}
 
+	async renameSound(tokens: string[], message: Message) {
+		const sepIndex = tokens.indexOf("-")
+		if (!this.isTextChannel(message.channel)) {
+			return
+		}
+		if (sepIndex === -1 || tokens.length <= (sepIndex + 1)) {
+			message.author.send("Arguments missing. Check the help for `!rename` by sending `!help` to the sounds channel.")
+		}
+		const sounds = await this.provider.getSoundsForGuild(message.channel.guild.id)
+		const oldName = tokens.slice(0, sepIndex).join(" ")
+		const newName = tokens.slice(sepIndex + 1).join(" ")
+		const sound = sounds.find(sound => sound.name === oldName)
+		if (!sound) {
+			message.author.send("I did not find a sound with the name " + oldName + ". Check your sounds with `!get_sounds`.")
+			return
+		}
+		this.provider.renameSound(sound.id, newName)
+			.then(_ => {
+				if (!this.isTextChannel(message.channel)) {
+					return
+				}
+				this.needsRebuild.add(message.channel.guild)
+				message.author.send("Renamed sound " + oldName + " to " + newName + ". Use `!rebuild` to rebuild the sound channel once all changes are applied.")
+			})
+	}
+
 	sendSoundsForGuild(message: Message) {
 		if (!this.isTextChannel(message.channel)) {
 			return // Typescript cleanup
@@ -428,6 +461,7 @@ export default class Sounds implements IAsyncInitializable {
 			"\t- `!add_sound [--hidden|-h] soundname` adds the sound with the given name", // TODO explain hidden
 			"\t- `!remove_sound soundname` removes the sound with the given name",
 			"\t- `!get_sounds` sends you a list of all sounds on this server",
+			"\t- `!rename_sound oldName - newName` renames the sound to the new name",
 			"\t- `!add_entree soundname @user [@user ...]` adds an entree with the given soundname to the mentioned user(s)",
 			"\t- `!remove_entree @user [@user ...]` removes the entree sound(s) for the given user(s)",
 			"\t- `!rebuild` rebuild the sound channel if there are pending changes",

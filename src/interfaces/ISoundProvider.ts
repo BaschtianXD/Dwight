@@ -14,7 +14,7 @@ export interface ISoundProvider extends IAsyncInitializable {
 
 	/**
 	 * 
-	 * @param soundId  If of the sound
+	 * @param soundId  Id of the sound
 	 * @returns A promise resolving to the filepath to the given sound
 	 */
 	getPathToSound(soundId: Snowflake): Promise<string>
@@ -35,6 +35,13 @@ export interface ISoundProvider extends IAsyncInitializable {
 	 * @returns A promise for chaining
 	 */
 	removeSound(soundId: Snowflake): Promise<void>
+
+	/**
+	 * Renames the sound with the given id to the given new name.
+	 * @param soundId the id of the sound to rename
+	 * @param newName new name of the sound
+	 */
+	renameSound(soundId: Snowflake, newName: string): Promise<void>
 
 	/**
 	 * Remove all data for a specified guild
@@ -111,5 +118,6 @@ export type TEntreeListEntry = {
 export enum ErrorTypes {
 	soundUsed,
 	limitReached,
-	duplicatedName
+	duplicatedName,
+	noSoundFoundForId
 }

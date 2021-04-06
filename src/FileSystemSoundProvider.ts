@@ -27,6 +27,9 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 			return
 		}
 	}
+	renameSound(soundId: string, newName: string): Promise<void> {
+		return Promise.resolve()
+	}
 	getEntreeSoundIdForGuildUser(guildId: string, userId: string): Promise<string | undefined> {
 		return Promise.resolve(undefined)
 	}

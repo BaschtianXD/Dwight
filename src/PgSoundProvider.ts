@@ -5,6 +5,9 @@ import * as fs from "fs"
 import Axios from "axios";
 
 export default class PgSoundProvider implements ISoundProvider {
+	renameSound(soundId: string, newName: string): Promise<void> {
+		return Promise.resolve() // TODO
+	}
 
 	basePath = process.env.DWIGHT_SOUNDS_PATH!
 	maxSoundNameLength = 64

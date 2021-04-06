@@ -53,7 +53,7 @@ export default class SequelizeSoundProvider implements ISoundProvider {
 
     async addSoundForGuild(guildId: string, url: string, name: string, hidden: boolean): Promise<void> {
         const id = SnowflakeUtil.generate()
-        const sounds = await Sound.findAll({ where: { guildID: guildId } })
+        const sounds = await Sound.findAll({ where: { guildID: guildId, deleted: false } })
         const limit = await this.getLimitForGuild(guildId)
         if (sounds.length >= limit) {
             return Promise.reject(ErrorTypes.limitReached)
@@ -83,6 +83,18 @@ export default class SequelizeSoundProvider implements ISoundProvider {
         } else {
             return Promise.reject()
         }
+    }
+
+    renameSound(soundId: string, newName: string): Promise<void> {
+        return Sound.findByPk(soundId)
+            .then(sound => {
+                if (!sound) {
+                    return Promise.reject(ErrorTypes.noSoundFoundForId)
+                }
+                sound.soundName = newName
+                return sound.save()
+            })
+            .then()
     }
 
     async removeAllDataForGuild(guildId: string): Promise<void> {
