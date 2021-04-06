@@ -447,9 +447,9 @@ export default class Sounds implements IAsyncInitializable {
 			.then(sounds => {
 				var mess = "Sounds for server " + guild.name + ":"
 				sounds.forEach(sound => {
-					mess += "\n- " + (sound.hidden ? "*" : "") + sound.name + (sound.hidden ? "*" : "")
+					mess += "\n\t- " + (sound.hidden ? "*" : "") + sound.name + (sound.hidden ? "*" : "")
 				})
-				mess += "\nThere are " + sounds.length + " sounds on this server."
+				mess += "\nThere " + (sounds.length > 1 ? "are " : "is ") + sounds.length + " sound" + (sounds.length > 1 ? "s" : "") + " on this server."
 				mess += "\nCursive sounds are hidden."
 				message.author.send(mess)
 			})
