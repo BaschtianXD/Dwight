@@ -28,12 +28,9 @@
     "dotenv": "^8.2.0",
     "pg": "^8.5.0",
     "pg-listen": "^1.6.0",
-    "reflect-metadata": "^0.1.13",
     "sequelize": "^6.5.1",
     "sequelize-typescript": "^2.1.0",
-    "tedious": "^11.0.6",
-    "tedious-connection-pool": "^1.0.5",
-    "tiny-typed-emitter": "^2.0.3"
+    "tedious": "^11.0.7"
   },
   "devDependencies": {
     "@types/tedious": "^4.0.3",
