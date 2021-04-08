@@ -1,4 +1,4 @@
-import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, DMChannel, NewsChannel, VoiceState, GuildChannel } from "discord.js";
+import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, DMChannel, NewsChannel, VoiceState, GuildChannel, Channel, GuildMember } from "discord.js";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ErrorTypes, ISoundProvider } from "./interfaces/ISoundProvider";
 import SequelizeSoundProvider from "./SequelizeSoundProvider";
@@ -39,6 +39,7 @@ export default class Sounds implements IAsyncInitializable {
 				this.client.on("guildDelete", guild => this.onGuildDelete(guild))
 				this.client.on("message", message => this.onMessage(message as Message))
 				this.client.on("voiceStateUpdate", (oldState, newState) => this.onVoiceStateChanged(oldState, newState))
+				this.client.ws.on("INTERACTION_CREATE" as any, this.onInteractionCreate)
 				console.log("Sounds initialized")
 			})
 	}
@@ -213,6 +214,7 @@ export default class Sounds implements IAsyncInitializable {
 	}
 
 	onMessage(message: Message) {
+		const genericHelp = " Send `!help` to the sound channel for more informamtion."
 		// filter messages that come from Dwight self and that do not come from sound channels
 		if (message.author.id !== this.client.user?.id && this.isTextChannel(message.channel) && this.channels.includes(message.channel)) {
 			const tokens = message.content.split(" ")
@@ -221,22 +223,75 @@ export default class Sounds implements IAsyncInitializable {
 			const token = tokens.shift()
 			switch (token) {
 				case "!add_sound":
-					this.addSoundToGuild(tokens, message)
+					var hidden = false
+					if (tokens[0] === "--hidden" || tokens[0] === "-h") {
+						hidden = true
+						tokens.shift()
+					}
+					if (tokens.length < 2) {
+						message.author.send("You need to provide a url and a name for the sound." + genericHelp)
+						return
+					}
+					const url = tokens.shift()!
+					var name = tokens.join(" ")
+					if (name.length > this.provider.maxSoundNameLength) {
+						message.author.send("The name of the sound is too long (max. " + this.provider.maxSoundNameLength + " charackters long)." + genericHelp)
+						return
+					}
+					this.addSoundToGuild(name, url, hidden, message)
 					break
 				case "!remove_sound":
-					this.removeSound(tokens, message)
+					if (tokens.length === 0) {
+						message.author.send("We need the name of the sound to delete.")
+						return
+					}
+					var name = tokens.join(" ")
+					this.removeSound(name, message)
 					break
 				case "!get_sounds":
 					this.sendSoundsForGuild(message)
 					break
 				case "!rename_sound":
-					this.renameSound(tokens, message)
+					const sepIndex = tokens.indexOf("-")
+					if (sepIndex === -1 || tokens.length <= (sepIndex + 1)) {
+						message.author.send("Arguments missing. Check the help for `!rename` by sending `!help` to the sounds channel.")
+					}
+					const oldName = tokens.slice(0, sepIndex).join(" ")
+					const newName = tokens.slice(sepIndex + 1).join(" ")
+					this.renameSound(oldName, newName, message)
 					break
 				case "!add_entree":
-					this.addEntree(tokens, message)
+					const soundName = tokens.filter(value => !value.startsWith("<@")).join(" ")
+					if (message.mentions.members == undefined) {
+						// This path should not be reached
+						console.error(Date.now() + ": addEntree reached impossible path 0")
+						return
+					}
+					if (message.mentions.members.size !== 1) {
+						// Check that there are users mentioned.
+						message.author.send("You need to mention exactly 1 user to add entree for." + genericHelp)
+						return
+					}
+					if (soundName === "") {
+						message.author.send("You need to add the name of the sound to use as entree. Use `!get_sounds` to see all sounds.")
+						return
+					}
+					var user = message.mentions.members.first()!
+					this.addEntree(soundName, user, message)
 					break
 				case "!remove_entree":
-					this.removeEntree(tokens, message)
+					if (message.mentions.members == undefined) {
+						// This path should not be reached
+						console.error(Date.now() + ": addEntree reached impossible path 0")
+						return
+					}
+					if (message.mentions.members.size !== 1) {
+						// Check that there are users mentioned.
+						message.author.send("You need to mention exactly 1 user to remove entree for." + genericHelp)
+						return
+					}
+					var user = message.mentions.members.first()!
+					this.removeEntree(user, message)
 					break
 				case "!rebuild":
 					this.initForGuild(message.channel.guild)
@@ -253,16 +308,27 @@ export default class Sounds implements IAsyncInitializable {
 		}
 	}
 
-	removeEntree(tokens: string[], message: Message) {
-		const genericHelp = " Send `!help` to the sound channel for more informamtion."
-		const channel = message.channel
-		if (!this.isTextChannel(channel)) return
-		if (message.mentions.members === null || message.mentions.members.size === 0) {
-			// Check that there are users mentioned.
-			message.author.send("You need to mention users to remove entree for." + genericHelp)
+	async onInteractionCreate(interaction: Interaction) {
+		if (!interaction.channel_id) {
 			return
 		}
-		Promise.all(message.mentions.members.map(guildMember => this.provider.removeEntree(channel.guild.id, guildMember.id)))
+		const channel = await this.client.channels.fetch(interaction.channel_id)
+		if (!interaction.data || !this.isTextChannel(channel)) {
+			return
+		}
+		const command = interaction.data.name.toLowerCase();
+		const args = interaction.data.options;
+
+		switch (command) {
+			case "add_sound":
+				console.log()
+		}
+	}
+
+	removeEntree(user: GuildMember, message: Message) {
+		const channel = message.channel
+		if (!this.isTextChannel(channel)) return
+		this.provider.removeEntree(channel.guild.id, user.id)
 			.then(_ => {
 				message.author.send("Removed entrees for users.")
 			})
@@ -273,25 +339,11 @@ export default class Sounds implements IAsyncInitializable {
 			})
 	}
 
-	addEntree(tokens: string[], message: Message) {
+	addEntree(soundName: string, user: GuildMember, message: Message) {
 		const genericHelp = " Send `!help` to the sound channel for more informamtion."
 		const channel = message.channel
 		if (!this.isTextChannel(channel)) return
-		if (message.mentions.members == undefined) {
-			// This path should not be reached
-			console.error(Date.now() + ": addEntree reached impossible path 0")
-			return
-		}
-		if (message.mentions.members.size === 0) {
-			// Check that there are users mentioned.
-			message.author.send("You need to mention users to add entree for." + genericHelp)
-			return
-		}
-		const soundName = tokens.filter(value => !value.startsWith("<@")).join(" ")
-		if (soundName === "") {
-			message.author.send("You need to add the name of the sound to use as entree. Use `!get_sounds` to see all sounds.")
-			return
-		}
+
 
 		this.provider.getSoundsForGuild(channel.guild.id)
 			.then(sounds => {
@@ -301,7 +353,7 @@ export default class Sounds implements IAsyncInitializable {
 					return Promise.reject(13)
 				}
 				if (!message.mentions.members) return
-				return Promise.all(message.mentions.members.map(guildMember => this.provider.addEntree(channel.guild.id, guildMember.id, sound.id)))
+				return this.provider.addEntree(channel.guild.id, user.id, sound.id)
 			})
 			.then(_ => {
 				message.author.send("Added entrees for users.")
@@ -315,39 +367,8 @@ export default class Sounds implements IAsyncInitializable {
 			})
 	}
 
-	async addSoundToGuild(tokens: string[], message: Message) {
-		var hidden = false
+	async addSoundToGuild(name: string, url: string, hidden: boolean, message: Message) {
 		const genericHelp = " Send `!help` to the sound channel for more informamtion."
-		if (tokens[0] === "--hidden" || tokens[0] === "-h") {
-			hidden = true
-			tokens.shift()
-		}
-		if (tokens.length === 0) {
-			message.author.send("You need to provide a name for the sound." + genericHelp)
-			return
-		}
-		const name = tokens.join(" ")
-		if (name.length > this.provider.maxSoundNameLength) {
-			message.author.send("The name of the sound is too long (max. " + this.provider.maxSoundNameLength + " charackters long)." + genericHelp)
-			return
-		}
-		if (message.attachments.size === 0) {
-			message.author.send("You need to attach a soundfile to the message (.mp3, max. 200kb)." + genericHelp)
-			return
-		}
-		if (message.attachments.size > 1) {
-			message.author.send("You can only add one sound per command." + genericHelp)
-			return
-		}
-		const attachment = message.attachments.first()!
-		if (attachment.size > this.maxFileSize) {
-			message.author.send("The soundfile is too big (max. 200kb)." + genericHelp)
-			return
-		}
-		if (!attachment.name?.endsWith(".mp3")) {
-			message.author.send("The soundfile must be mp3." + genericHelp)
-			return
-		}
 		if (!this.isTextChannel(message.channel)) {
 			return // Typescript cleanup
 		}
@@ -356,7 +377,7 @@ export default class Sounds implements IAsyncInitializable {
 		if (sounds.some(sound => sound.name === name)) {
 			message.author.send("This name is already in use. Either remove/rename the old sound first or use another name.")
 		}
-		this.provider.addSoundForGuild(guild.id, attachment.url, name, hidden)
+		this.provider.addSoundForGuild(guild.id, url, name, hidden)
 			.then(() => {
 				if (!hidden) {
 					this.needsRebuild.add(guild)
@@ -365,28 +386,29 @@ export default class Sounds implements IAsyncInitializable {
 
 			})
 			.catch(reason => {
-				if (reason === ErrorTypes.limitReached) {
-					message.author.send("You have already reached the maximum number of sounds." + genericHelp)
-					return
-				} else if (reason === ErrorTypes.duplicatedName) {
-					message.author.send("This name is already in use. Either remove the old sound first or use another name.")
+				switch (reason) {
+					case ErrorTypes.limitReached:
+						message.author.send("You have already reached the maximum number of sounds." + genericHelp)
+						return
+					case ErrorTypes.duplicatedName:
+						message.author.send("This name is already in use. Either remove the old sound first or use another name.")
+						return
+					case ErrorTypes.fileTooLarge:
+						message.author.send("The file is too large. Max 200kb")
+						return
+					default:
+						const date = Date.now()
+						message.author.send("There was an unexplained error, sorry. Please contact my developer Bauer#9456 with the follwing number: " + date)
+						console.error(date + ": " + reason)
+						console.trace()
 				}
-				const date = Date.now()
-				message.author.send("There was an unexplained error, sorry. Please contact my developer Bauer#9456 with the follwing number: " + date)
-				console.error(date + ": " + reason)
-				console.trace()
 			})
 	}
 
-	removeSound(tokens: string[], message: Message) {
+	removeSound(name: string, message: Message) {
 		if (!this.isTextChannel(message.channel)) {
 			return // Typescript cleanup
 		}
-		if (tokens.length === 0) {
-			message.author.send("We need the name of the sound to delete.")
-			return
-		}
-		const name = tokens.join(" ")
 		const guild = message.channel.guild
 		this.provider.getSoundsForGuild(guild.id)
 			.then(list => {
@@ -412,17 +434,11 @@ export default class Sounds implements IAsyncInitializable {
 			})
 	}
 
-	async renameSound(tokens: string[], message: Message) {
-		const sepIndex = tokens.indexOf("-")
+	async renameSound(oldName: string, newName: string, message: Message) {
 		if (!this.isTextChannel(message.channel)) {
 			return
 		}
-		if (sepIndex === -1 || tokens.length <= (sepIndex + 1)) {
-			message.author.send("Arguments missing. Check the help for `!rename` by sending `!help` to the sounds channel.")
-		}
 		const sounds = await this.provider.getSoundsForGuild(message.channel.guild.id)
-		const oldName = tokens.slice(0, sepIndex).join(" ")
-		const newName = tokens.slice(sepIndex + 1).join(" ")
 		const sound = sounds.find(sound => sound.name === oldName)
 		if (!sound) {
 			message.author.send("I did not find a sound with the name " + oldName + ". Check your sounds with `!get_sounds`.")
@@ -458,7 +474,7 @@ export default class Sounds implements IAsyncInitializable {
 	sendHelp(message: Message) {
 		const help = [
 			"I offer the follwing commands:",
-			"\t- `!add_sound [--hidden|-h] soundname` adds the sound with the given name", // TODO explain hidden
+			"\t- `!add_sound [--hidden|-h] url soundname` adds the sound at the given url with the given name, hidden makes this not appear in the sounds channel", // TODO explain hidden
 			"\t- `!remove_sound soundname` removes the sound with the given name",
 			"\t- `!get_sounds` sends you a list of all sounds on this server",
 			"\t- `!rename_sound oldName - newName` renames the sound to the new name",
@@ -513,7 +529,37 @@ export default class Sounds implements IAsyncInitializable {
 		return messages
 	}
 
-	isTextChannel(channel: TextChannel | DMChannel | NewsChannel | GuildChannel): channel is TextChannel {
+	isTextChannel(channel: Channel): channel is TextChannel {
 		return channel.type === "text"
 	}
+}
+
+type Interaction = {
+	id: string,
+	application_id: string,
+	type: InteractionType,
+	data?: ApplicationCommandInteractionData,
+	guild_id?: string,
+	channel_id?: string,
+	member: object,
+	user: object,
+	token: string,
+	version: number
+}
+
+enum InteractionType {
+	Ping = 1,
+	ApplicationCommand = 2
+}
+
+type ApplicationCommandInteractionData = {
+	id: string,
+	name: string,
+	options?: ApplicationCommandInteractionDataOption[]
+}
+
+type ApplicationCommandInteractionDataOption = {
+	name: string,
+	value: number,
+	options?: ApplicationCommandInteractionDataOption
 }

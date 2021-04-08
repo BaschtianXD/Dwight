@@ -61,7 +61,11 @@ export default class SequelizeSoundProvider implements ISoundProvider {
         if (sounds.some(sound => sound.soundName === name)) {
             return Promise.reject(ErrorTypes.duplicatedName)
         }
-        this.download(url, this.basePath + "/" + id + ".mp3")
+        try {
+            await this.download(url, this.basePath + "/" + id + ".mp3")
+        } catch (err) {
+            return Promise.reject(ErrorTypes.fileTooLarge)
+        }
         return Sound.create({
             soundID: id,
             guildID: guildId,
@@ -186,7 +190,8 @@ export default class SequelizeSoundProvider implements ISoundProvider {
         return Axios({
             method: "get",
             url: url,
-            responseType: "stream"
+            responseType: "stream",
+            maxContentLength: 2000000
         })
             .then(response => {
                 response.data.pipe(fs.createWriteStream(destination))
