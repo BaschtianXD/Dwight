@@ -119,5 +119,6 @@ export enum ErrorTypes {
 	soundUsed,
 	limitReached,
 	duplicatedName,
-	noSoundFoundForId
+	noSoundFoundForId,
+	fileTooLarge
 }
