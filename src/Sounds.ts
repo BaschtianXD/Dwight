@@ -34,7 +34,10 @@ export default class Sounds implements IAsyncInitializable {
 		return this.provider.initialize()
 			.then(_ => {
 				// Typecasting as we dont have partials enabled
-				this.client.on("messageReactionAdd", (reaction, user) => this.onMessageReactionAdd(reaction, user as User))
+				if (process.env.NODE_ENV !== "DEVELOPMENT") {
+					// Only do this in prod as on dev we do not have access to sound files
+					this.client.on("messageReactionAdd", (reaction, user) => this.onMessageReactionAdd(reaction, user as User))
+				}
 				this.client.on("ready", () => this.onReady(this.client))
 				this.client.on("guildCreate", guild => this.onGuildCreate(guild))
 				this.client.on("guildDelete", guild => this.onGuildDelete(guild))
@@ -130,7 +133,7 @@ export default class Sounds implements IAsyncInitializable {
 							return new Promise(resolve => {
 								this.messages.set(reaction.message.id, cur.id)
 								// Set timeout so we dont hit the discord api rate limit
-								setTimeout(() => resolve(), 1000)
+								setTimeout(() => resolve(), 1100)
 							})
 						}), Promise.resolve())
 			})
@@ -161,9 +164,9 @@ export default class Sounds implements IAsyncInitializable {
 		}
 	}
 
-	playSoundInChannel(soundId: Snowflake, voiceChannel: VoiceChannel, userId: Snowflake) {
+	playSoundInChannel(soundId: Snowflake, voiceChannel: VoiceChannel, userId: Snowflake, force: boolean = false) {
 		const disp = this.connections.get(voiceChannel.id)
-		if (disp) {
+		if (disp && !force) {
 			disp.pause()
 		} else {
 			this.provider.getPathToSound(soundId)
@@ -212,7 +215,7 @@ export default class Sounds implements IAsyncInitializable {
 				if (!soundId || !newState.channel) {
 					return
 				}
-				this.playSoundInChannel(soundId, newState.channel, newState.client.user!.id)
+				this.playSoundInChannel(soundId, newState.channel, newState.client.user!.id, true)
 			})
 	}
 
@@ -380,6 +383,7 @@ export default class Sounds implements IAsyncInitializable {
 
 		switch (command) {
 			case "rebuild":
+				this.answerInteraction(interaction.id, interaction.token, "I will rebuild this channel soon...")
 				this.initForGuild(guild)
 				break
 			case "get_sounds":

@@ -1,5 +1,6 @@
 import * as Discord from "discord.js"
 import Sounds from "./Sounds"
+import * as http from "http"
 
 const client = new Discord.Client();
 client.token = process.env.DISCORD_AUTH_TOKEN || null
@@ -36,3 +37,18 @@ Promise.all([
 		process.exit(1)
 	})
 
+// Readiness/Liveness probe
+const host = 'localhost';
+const port = 8080;
+const server = http.createServer((req, res) => {
+	if (client.user) {
+		res.writeHead(200)
+	} else {
+		res.writeHead(500)
+	}
+	res.end()
+})
+
+server.listen(port, host, () => {
+	console.log("Init readiness probe")
+})
