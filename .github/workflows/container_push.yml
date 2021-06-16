@@ -36,4 +36,5 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
       
-      - run: docker push dwightcr.azurecr.io/dwight:latest dwightcr.azurecr.io/dwight:${{ github.sha }}
+      - run: docker push dwightcr.azurecr.io/dwight:latest
+      - run: docker push dwightcr.azurecr.io/dwight:${{ github.sha }}
