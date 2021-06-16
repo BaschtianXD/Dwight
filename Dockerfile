@@ -1,7 +1,9 @@
 ARG NODE_ENV=production
 
 FROM node:14-alpine
-RUN apk add ffmpeg
+RUN useradd -d /home/bob -m -s /bin/bash bob
+USER bob
+RUN apk add --no-cache ffmpeg
 ENV NODE_ENV=${NODE_ENV}
 WORKDIR /usr/src/app
 COPY ["package.json", "package-lock.json*", "npm-shrinkwrap.json*", "./"]

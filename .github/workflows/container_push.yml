@@ -28,6 +28,7 @@ jobs:
       - uses: Azure/container-scan@v0.1
         with:
           image-name: dwightcr.azurecr.io/dwight:latest
+          severity-threshold: CRITICAL
       
       - uses: Azure/docker-login@v1
         with:
