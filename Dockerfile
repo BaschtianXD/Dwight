@@ -1,8 +1,7 @@
 ARG NODE_ENV=production
 
 FROM node:14-alpine
-RUN useradd -d /home/bob -m -s /bin/bash bob
-USER bob
+USER 405
 RUN apk add --no-cache ffmpeg
 ENV NODE_ENV=${NODE_ENV}
 WORKDIR /usr/src/app
