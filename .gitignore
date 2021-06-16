@@ -1,7 +1,3 @@
-# Sounds folder
-sounds
-
-
 # Logs
 logs
 *.log
@@ -69,6 +65,9 @@ typings/
 
 # dwight tsc build folder
 dist
+
+# Azure deployment
+deploy-container.yaml
 
 #my stuff
 .me
