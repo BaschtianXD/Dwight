@@ -1,7 +1,6 @@
 ARG NODE_ENV=production
 
-FROM node:14-
-#use guestuser
+FROM node:14-alpine
 USER 405
 RUN apk add --no-cache ffmpeg
 ENV NODE_ENV=${NODE_ENV}
