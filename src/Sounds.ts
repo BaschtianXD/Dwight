@@ -1,5 +1,6 @@
 import axios from "axios";
-import { Client, Guild, Snowflake, MessageReaction, User, StreamDispatcher, TextChannel, VoiceChannel, Collection, GuildCreateChannelOptions, GuildChannelManager, Message, DMChannel, NewsChannel, VoiceState, GuildChannel, Channel, GuildMember, MessageEmbed, TextBasedChannelFields, APIMessage } from "discord.js";
+import { Client, Guild, Snowflake, MessageReaction, User, TextChannel, VoiceChannel, Collection, GuildChannelManager, Message, DMChannel, NewsChannel, VoiceState, GuildChannel, Channel, GuildMember, MessageEmbed, TextBasedChannelFields, StageChannel, GuildChannelCreateOptions, PartialDMChannel } from "discord.js";
+import { joinVoiceChannel, getVoiceConnection, createAudioResource, createAudioPlayer, AudioPlayerStatus, entersState, VoiceConnectionStatus, AudioPlayer } from "@discordjs/voice";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ErrorTypes, ISoundProvider } from "./interfaces/ISoundProvider";
 import SequelizeSoundProvider from "./SequelizeSoundProvider";
@@ -10,8 +11,9 @@ export default class Sounds implements IAsyncInitializable {
 	maxFileSize = 204800 // 200 kb
 
 	client: Client
-	// Snowflake -> Id of channel
-	connections: Collection<Snowflake, StreamDispatcher>
+
+	// ChannelId -> AudioPlayer
+	players: Collection<Snowflake, AudioPlayer>
 
 	// Message id -> soundId
 	messages: Collection<Snowflake, Snowflake>
@@ -22,11 +24,10 @@ export default class Sounds implements IAsyncInitializable {
 
 	constructor(client: Client) {
 		this.client = client
-		this.connections = new Collection()
 		this.messages = new Collection()
 		this.channels = []
 		this.needsRebuild = new Set()
-
+		this.players = new Collection()
 		this.provider = new SequelizeSoundProvider()
 	}
 
@@ -36,12 +37,12 @@ export default class Sounds implements IAsyncInitializable {
 				// Typecasting as we dont have partials enabled
 				if (process.env.NODE_ENV !== "DEVELOPMENT") {
 					// Only do this in prod as on dev we do not have access to sound files
-					this.client.on("messageReactionAdd", (reaction, user) => this.onMessageReactionAdd(reaction, user as User))
+					this.client.on("messageReactionAdd", (reaction, user) => this.onMessageReactionAdd(reaction as MessageReaction, user as User))
 				}
 				this.client.on("ready", () => this.onReady(this.client))
 				this.client.on("guildCreate", guild => this.onGuildCreate(guild))
 				this.client.on("guildDelete", guild => this.onGuildDelete(guild))
-				this.client.on("message", message => this.onMessage(message as Message))
+				this.client.on("messageCreate", message => this.onMessage(message as Message))
 				this.client.on("voiceStateUpdate", (oldState, newState) => this.onVoiceStateChanged(oldState, newState))
 				this.client.ws.on("INTERACTION_CREATE" as any, interaction => this.onInteractionCreate(interaction))
 				console.log("Sounds initialized")
@@ -78,9 +79,9 @@ export default class Sounds implements IAsyncInitializable {
 
 	}
 
-	createChannel(channelManager: GuildChannelManager, userId: Snowflake): Promise<TextChannel> {
-		const options: GuildCreateChannelOptions = {
-			type: "text",
+	async createChannel(channelManager: GuildChannelManager, userId: Snowflake): Promise<TextChannel> {
+		const options: GuildChannelCreateOptions = {
+			type: "GUILD_TEXT",
 			topic: "Here are the sounds you can play. Press the reaction of a sound to play it in your voice channel. Use my / commands to interact with me.",
 			permissionOverwrites: [
 				{
@@ -94,21 +95,22 @@ export default class Sounds implements IAsyncInitializable {
 			]
 		}
 
-		const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === "text")
+		const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === "GUILD_TEXT") as GuildChannel
 		if (oldChannel) {
 			if (oldChannel.deletable) {
-				options.parent = oldChannel.parentID ?? undefined
+				options.parent = oldChannel.parentId ?? undefined
 				options.position = oldChannel.position
-				options.permissionOverwrites = oldChannel.permissionOverwrites
-				return oldChannel.delete("I need to recreate the channel")
+				options.permissionOverwrites = oldChannel.permissionOverwrites.cache.map(foo => foo)
+				return oldChannel.delete()
 					.then(() => channelManager.create("sounds", options) as Promise<TextChannel>)
 					.then(channel => {
 						this.channels.push(channel.id)
 						return channel
 					})
 			} else {
-				if (channelManager.guild.owner) {
-					channelManager.guild.owner.send("I could not delete the current sounds channel. Please check my permissions and allow me to do so. Then try again or contact my creator Bauer#9456.")
+				let owner = await channelManager.guild.members.fetch(channelManager.guild.ownerId)
+				if (owner) {
+					owner.send("I could not delete the current sounds channel. Please check my permissions and allow me to do so. Then try again or contact my creator Bauer#9456.")
 				}
 				return Promise.reject("missing permission")
 			}
@@ -143,13 +145,12 @@ export default class Sounds implements IAsyncInitializable {
 			})
 	}
 
-	onMessageReactionAdd(messageReaction: MessageReaction, user: User) {
+	async onMessageReactionAdd(messageReaction: MessageReaction, user: User) {
 		if (user.id === this.client.user?.id || !(messageReaction.message.guild)) {
 			return
 		}
-		const guild = messageReaction.message.guild
 		if (this.channels.includes(messageReaction.message.channel.id)) {
-			const voiceChannel = guild.member(user)?.voice.channel
+			const voiceChannel = (await messageReaction.message.guild.members.fetch(user)).voice.channel
 			const soundId = this.messages.get(messageReaction.message.id)
 			if (voiceChannel && soundId) {
 				this.playSoundInChannel(soundId, voiceChannel, user.id)
@@ -164,29 +165,39 @@ export default class Sounds implements IAsyncInitializable {
 		}
 	}
 
-	playSoundInChannel(soundId: Snowflake, voiceChannel: VoiceChannel, userId: Snowflake, force: boolean = false) {
-		const disp = this.connections.get(voiceChannel.id)
-		if (disp && !force) {
-			disp.pause()
+	async playSoundInChannel(soundId: Snowflake, voiceChannel: VoiceChannel | StageChannel, userId: Snowflake, force: boolean = false) {
+		var oldPlayer = this.players.get(voiceChannel.id)
+		let resource = createAudioResource(await this.provider.getPathToSound(soundId))
+		if (oldPlayer) {
+			// Currently playing a sound in a channel
+			if (force) {
+				// Overwrite old resource and play new
+				oldPlayer.play(resource)
+			} else {
+				// Stop playing and disconnect from channel
+				let connection = getVoiceConnection(voiceChannel.guildId)! // As we have a player we should also have a connection
+				connection.disconnect()
+				connection.destroy()
+				oldPlayer.stop()
+			}
 		} else {
-			this.provider.getPathToSound(soundId)
-				.then(soundPath => Promise.all([soundPath, voiceChannel.join()]))
-				.then(([soundPath, connection]) => {
-					const dispatcher = connection.play(soundPath, { "volume": false })
-					dispatcher.on("speaking", speaking => {
-						if (!speaking) {
-							voiceChannel.leave()
-							this.connections.delete(voiceChannel.id)
-						}
-					})
-					this.connections.set(voiceChannel.id, dispatcher)
-					this.provider.soundPlayed(userId, soundId)
+			let player = createAudioPlayer()
+			player.play(resource)
+			let connection = joinVoiceChannel({
+				channelId: voiceChannel.id,
+				guildId: voiceChannel.guildId,
+				adapterCreator: voiceChannel.guild.voiceAdapterCreator
+			})
+			connection.on(VoiceConnectionStatus.Ready, () => {
+				connection.subscribe(player) // Player should start automatically
+				this.provider.soundPlayed(userId, soundId)
+					.catch(_ => console.log("Could not log a play."))
+				player.on(AudioPlayerStatus.Idle, () => {
+					connection.disconnect() // TODO check if these actions were successfull
+					connection.destroy()
+					player.stop()
 				})
-				.catch(reason => {
-					console.error(new Date() + ": " + reason)
-					console.trace()
-				})
-
+			})
 		}
 
 	}
@@ -606,7 +617,7 @@ export default class Sounds implements IAsyncInitializable {
 		}
 		for (var i = 0; i < messages.length; i++) {
 			this.messages.set(messages[i].id, filteredSounds[i].id)
-			const arr = messages[i].reactions.cache.array()
+			const arr = messages[i].reactions.cache.map(reaction => reaction)
 			if (arr.length !== 1 || arr[0].emoji.name !== "🔊" || arr[0].count !== 1 || !arr[0].me) {
 				await messages[i].reactions.removeAll()
 				await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
@@ -632,8 +643,9 @@ export default class Sounds implements IAsyncInitializable {
 		return messages
 	}
 
-	isTextChannel(channel: Channel): channel is TextChannel {
-		return channel.type === "text"
+	isTextChannel(channel: Channel | PartialDMChannel | null): channel is TextChannel {
+		// Partials are turned off
+		return channel !== null && !channel.partial && channel.isText() && !channel.isThread()
 	}
 
 	// SLASH COMMANDS
