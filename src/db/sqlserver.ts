@@ -1,5 +1,5 @@
 import { ConnectionConfig, Request, TediousType } from "tedious"
-import * as ConnectionPool from "tedious-connection-pool"
+import ConnectionPool from "tedious-connection-pool";
 
 const poolConfig: ConnectionPool.PoolConfig = {
 	min: 2,
@@ -7,7 +7,7 @@ const poolConfig: ConnectionPool.PoolConfig = {
 };
 
 const connectionConfig: ConnectionConfig = {
-	server: process.env.HOST,
+	server: process.env.DBHOST,
 	authentication: {
 		type: 'default',
 		options: {
@@ -57,7 +57,7 @@ export async function query<T>(text: string, params: requestParameter[] = []): P
 }
 
 /**
- * When a simple 
+ * Gets a Connection from the pool.
  * @returns A promise that resolves to a PooledConnection
  */
 export async function getClient(): Promise<ConnectionPool.PooledConnection> {
@@ -81,6 +81,6 @@ export type QueryResult<T> = {
 	rows: T[]
 }
 
-process.on("exit", code => {
+process.on("exit", _ => {
 	pool.drain()
 })

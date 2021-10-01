@@ -125,7 +125,7 @@ export default class SequelizeSoundProvider implements ISoundProvider {
             });
 
             // If the execution reaches this line, the transaction has been committed successfully
-            // `result` is whatever was returned from the transaction callback (the `user`, in this case)
+            // `result` is whatever was returned from the transaction callback
 
         } catch (error) {
 
@@ -135,15 +135,15 @@ export default class SequelizeSoundProvider implements ISoundProvider {
         }
     }
 
-    addEntree(guildId: string, userId: string, soundId: string): Promise<void> {
+    async addEntree(guildId: string, userId: string, soundId: string): Promise<void> {
         return Entree.create({ guildID: guildId, userID: userId, soundID: soundId }).then()
     }
 
-    removeEntree(guildId: string, userId: string): Promise<void> {
+    async removeEntree(guildId: string, userId: string): Promise<void> {
         return Entree.destroy({ where: { guildID: guildId, userID: userId } }).then()
     }
 
-    getEntreesForGuild(guildId: string): Promise<TEntreeListEntry[]> {
+    async getEntreesForGuild(guildId: string): Promise<TEntreeListEntry[]> {
         return Entree.findAll({
             attributes: ["userID"],
             where: { guildID: guildId },
@@ -162,31 +162,31 @@ export default class SequelizeSoundProvider implements ISoundProvider {
             })
     }
 
-    getEntreeSoundIdForGuildUser(guildId: string, userId: string): Promise<string | undefined> {
+    async getEntreeSoundIdForGuildUser(guildId: string, userId: string): Promise<string | undefined> {
         return Entree.findOne({ where: { userID: userId, guildID: guildId } })
             .then(entree => entree?.soundID)
     }
 
-    getAmountOfSounds(guildId: string): Promise<number> {
+    async getAmountOfSounds(guildId: string): Promise<number> {
         return Sound.count({ where: { guildID: guildId, deleted: false } })
     }
 
-    getLimitForGuild(guildId: string): Promise<number> {
+    async getLimitForGuild(guildId: string): Promise<number> {
         return Limit.findByPk(guildId)
             .then(limit => limit ? Number(limit.maxsounds) : this.defaultSoundLimit)
     }
 
-    soundPlayed(userId: string, soundId: string): Promise<void> {
+    async soundPlayed(userId: string, soundId: string): Promise<void> {
         return Play.create({ userID: userId, soundID: soundId, time: new Date() })
             .then()
     }
 
-    initialize(): Promise<void> {
+    async initialize(): Promise<void> {
 
         return sequelize.sync().then()
     }
 
-    private download(url: string, destination: string): Promise<void> {
+    private async download(url: string, destination: string): Promise<void> {
         return Axios({
             method: "get",
             url: url,

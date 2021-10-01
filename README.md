@@ -6,7 +6,10 @@ A Discord Bot that plays sounds. Fully controlled from within the Discord app.
 Use [this link](https://discord.com/api/oauth2/authorize?client_id=609005073531404304&permissions=2184308816&scope=bot%20applications.commands) to add Dwight to your server. All checked permissions are required for Dwight to work.
 
 ## Requirements
-* Node.js >14.16.0
+* Node.js >16.6.0
+* npm > 7.0.0
+* libsodium-dev
+* FFmpeg
 * Git
 
 ## Running locally

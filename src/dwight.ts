@@ -1,9 +1,16 @@
-import * as Discord from "discord.js"
+import { Client, Intents } from "discord.js"
 import Sounds from "./Sounds"
 import * as http from "http"
 
-const client = new Discord.Client();
-client.token = process.env.DISCORD_AUTH_TOKEN || null
+const client = new Client({
+	intents: [
+		Intents.FLAGS.GUILDS,
+		Intents.FLAGS.GUILD_VOICE_STATES,
+		Intents.FLAGS.GUILD_MESSAGES,
+		Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
+		Intents.FLAGS.DIRECT_MESSAGES
+	]
+});
 
 client.on("ready", () => {
 	console.log('DISCORD API: Logged in as ' + client.user!.tag + '!');
@@ -31,7 +38,7 @@ const sounds = new Sounds(client)
 Promise.all([
 	sounds.initialize()
 ])
-	.then(_ => client.login())
+	.then(_ => client.login(process.env.DISCORD_AUTH_TOKEN!))
 	.catch(reason => {
 		console.log(Date.now() + ": " + reason)
 		process.exit(1)
