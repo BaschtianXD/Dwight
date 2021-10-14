@@ -228,10 +228,8 @@ export default class Sounds implements IAsyncInitializable {
 			var answer = ""
 			switch (interaction.commandName) {
 				case "rebuild":
-					interaction.reply({
-						ephemeral: true,
-						content: "I will rebuild this channel soon..."
-					})
+					answer += "I will rebuild this channel soon..."
+					this.initForGuild(interaction.guild)
 					break
 				case "get_sounds":
 					var sounds = await this.provider.getSoundsForGuild(interaction.guild.id)
@@ -545,7 +543,7 @@ export default class Sounds implements IAsyncInitializable {
  */
 function chunk<T>(src: Array<T>, count: number): Array<Array<T>> {
 	return src.reduce((acc, curr, index) => {
-		let bucket = index / count
+		let bucket = Math.floor(index / count)
 		let slot = index % count
 		if (slot === 0) {
 			acc[bucket] = []
