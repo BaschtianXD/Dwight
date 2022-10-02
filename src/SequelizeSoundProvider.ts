@@ -1,6 +1,5 @@
 import { SnowflakeUtil } from "discord.js";
-import { Sequelize } from "sequelize-typescript";
-import { Dialect } from "sequelize/types";
+import { Sequelize, Dialect } from "@sequelize/core";
 import { ErrorTypes, ISoundProvider, TEntreeListEntry, TSoundListEntry } from "./interfaces/ISoundProvider";
 import Entree from "./models/Entree";
 import Limit from "./models/Limit";
@@ -9,15 +8,15 @@ import Sound from "./models/Sound";
 import * as fs from "fs"
 import Axios from "axios";
 
-const sequelize = new Sequelize({
+export const sequelize = new Sequelize({
     dialect: process.env.DBDIALECT! as Dialect,
     database: process.env.DBDATABASE,
-    models: [__dirname + '/models'],
     username: process.env.DBUSER,
     password: process.env.DBPASSWORD,
     host: process.env.DBHOST,
     logging: process.env.NODE_ENV === "DEVELOPMENT" ? console.log : false
 })
+
 
 export default class SequelizeSoundProvider implements ISoundProvider {
 
@@ -67,7 +66,7 @@ export default class SequelizeSoundProvider implements ISoundProvider {
             return Promise.reject(ErrorTypes.fileTooLarge)
         }
         return Sound.create({
-            soundID: id,
+            soundID: id.toString(),
             guildID: guildId,
             soundName: name,
             hidden: hidden
@@ -156,7 +155,7 @@ export default class SequelizeSoundProvider implements ISoundProvider {
                 return entrees.map(entree => {
                     return {
                         userId: entree.userID,
-                        soundName: entree.sound.soundName
+                        soundName: entree.sound!.soundName // sound is included in query
                     }
                 })
             })

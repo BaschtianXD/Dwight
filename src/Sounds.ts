@@ -1,4 +1,4 @@
-import { Client, Guild, Snowflake, User, TextChannel, VoiceChannel, Collection, GuildChannelManager, Message, ApplicationCommand, VoiceState, GuildChannel, Channel, GuildMember, StageChannel, GuildChannelCreateOptions, PartialDMChannel, Interaction, CommandInteraction, GuildApplicationCommandPermissionData, MessageActionRow, MessageButton } from "discord.js";
+import { Client, Guild, Snowflake, User, TextChannel, VoiceChannel, Collection, GuildChannelManager, Message, ApplicationCommand, VoiceState, GuildChannel, Channel, GuildMember, StageChannel, GuildChannelCreateOptions, PartialDMChannel, Interaction, CommandInteraction, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessagePayload } from "discord.js";
 import { joinVoiceChannel, getVoiceConnection, createAudioResource, createAudioPlayer, AudioPlayerStatus, VoiceConnectionStatus, AudioPlayer } from "@discordjs/voice";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ErrorTypes, ISoundProvider } from "./interfaces/ISoundProvider";
@@ -37,7 +37,7 @@ export default class Sounds implements IAsyncInitializable {
 				this.client.on("ready", () => this.onReady(this.client))
 				this.client.on("guildCreate", guild => this.onGuildCreate(guild))
 				this.client.on("guildDelete", guild => this.onGuildDelete(guild))
-				this.client.on("voiceStateUpdate", (oldState, newState) => this.onVoiceStateChanged(oldState, newState))
+				this.client.on("voiceStateUpdate", (oldState, newState) => this.onVoiceStateChanged(oldState as VoiceState, newState as VoiceState))
 				this.client.on("interactionCreate", interaction => this.onInteractionCreate(interaction))
 				console.log("Sounds initialized")
 			})
@@ -76,28 +76,29 @@ export default class Sounds implements IAsyncInitializable {
 	async createChannel(channelManager: GuildChannelManager, userId: Snowflake): Promise<TextChannel> {
 
 		const options: GuildChannelCreateOptions = {
-			type: "GUILD_TEXT",
+			name: "sounds",
+			type: ChannelType.GuildText,
 			topic: "Here are the sounds you can play. Press the reaction of a sound to play it in your voice channel. Use my / commands to interact with me.",
 			permissionOverwrites: [
 				{
 					id: channelManager.guild.id,
-					deny: ['SEND_MESSAGES', 'ADD_REACTIONS']
+					deny: ["SendMessages", "AddReactions"]
 				},
 				{
 					id: userId,
-					allow: ['SEND_MESSAGES', 'ADD_REACTIONS']
+					allow: ["SendMessages", "AddReactions"]
 				}
 			]
 		}
 
-		const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === "GUILD_TEXT") as GuildChannel
+		const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === ChannelType.GuildText) as GuildChannel
 		if (oldChannel) {
 			if (oldChannel.deletable) {
 				options.parent = oldChannel.parentId ?? undefined
 				options.position = oldChannel.position
 				options.permissionOverwrites = oldChannel.permissionOverwrites.cache.map(foo => foo)
 				return oldChannel.delete()
-					.then(() => channelManager.create("sounds", options) as Promise<TextChannel>)
+					.then(() => channelManager.create(options) as Promise<TextChannel>)
 					.then(channel => {
 						this.channels.push(channel.id)
 						return channel
@@ -110,7 +111,7 @@ export default class Sounds implements IAsyncInitializable {
 				return Promise.reject("missing permission")
 			}
 		} else {
-			return channelManager.create("sounds", options)
+			return channelManager.create(options)
 				.then(channel => {
 					this.channels.push(channel.id)
 					return channel as TextChannel
@@ -121,9 +122,9 @@ export default class Sounds implements IAsyncInitializable {
 	async addSoundsToChannel(channel: TextChannel): Promise<void> {
 		let sounds = (await this.provider.getSoundsForGuild(channel.guild.id)).filter(sound => !sound.hidden)
 		let rows = chunk(sounds, 5).map(sounds => {
-			var row = new MessageActionRow()
+			let row = new ActionRowBuilder<ButtonBuilder>()
 			for (let sound of sounds) {
-				row = row.addComponents(new MessageButton().setCustomId(sound.id).setLabel(sound.name).setStyle("SECONDARY"))
+				row = row.addComponents(new ButtonBuilder().setCustomId(sound.id).setLabel(sound.name).setStyle(ButtonStyle.Secondary))
 			}
 			return row
 		})
@@ -224,7 +225,7 @@ export default class Sounds implements IAsyncInitializable {
 			return
 		}
 		if (interaction.isCommand() && interaction.guild) { // guild required for typescript typechecker
-			let args = interaction.options.data
+			let comOptions = interaction.options
 			var answer = ""
 			switch (interaction.commandName) {
 				case "rebuild":
@@ -239,9 +240,9 @@ export default class Sounds implements IAsyncInitializable {
 					}
 					break
 				case "add_sound":
-					var name = args.find(arg => arg.name === "name")?.value
-					var link = args.find(arg => arg.name === "link")?.value
-					var hidden = args.find(arg => arg.name === "hidden")?.value ?? false
+					var name = comOptions.get("name", true).value
+					var link = comOptions.get("link", true).value
+					var hidden = comOptions.get("hidden")?.value
 					if (typeof name !== "string" || typeof link !== "string" || (typeof hidden !== "undefined" && typeof hidden !== "boolean")) {
 						// Wrong arguments
 						answer += "You must provide valid arguments"
@@ -251,7 +252,7 @@ export default class Sounds implements IAsyncInitializable {
 					answer += `Added ${name}. Use \`/rebuild\` to apply the changes.`
 					break
 				case "delete_sound":
-					var name = args?.find(arg => arg.name === "name")?.value
+					var name = comOptions.get("name", true)?.value
 					if (typeof name !== "string") {
 						answer += "You must provide valid arguments"
 						break
@@ -266,8 +267,8 @@ export default class Sounds implements IAsyncInitializable {
 					answer += `Removed ${name} from this server. Use \`/rebuild\` to apply the changes.`
 					break
 				case "rename_sound":
-					let oldName = args?.find(arg => arg.name === "oldname")?.value
-					let newName = args?.find(arg => arg.name === "newname")?.value
+					let oldName = comOptions.get("oldname", true)?.value
+					let newName = comOptions.get("newname", true)?.value
 					if (typeof oldName !== "string" || typeof newName !== "string") {
 						answer += "You must provide valid arguments"
 						break
@@ -289,9 +290,9 @@ export default class Sounds implements IAsyncInitializable {
 					}
 					break
 				case "add_entree":
-					var userArg = args?.find(arg => arg.name === "user")
-					var soundNameArg = args?.find(arg => arg.name === "sound")
-					if (userArg?.type !== "USER" || typeof userArg.value !== "string" || soundNameArg?.type !== "STRING" || typeof soundNameArg.value !== "string") {
+					var user = comOptions.get("user", true).user
+					var soundNameArg = comOptions.get("sound", true)
+					if (!user || typeof soundNameArg.value !== "string") {
 						answer += "You must provide valid arguments."
 						break
 					}
@@ -302,17 +303,17 @@ export default class Sounds implements IAsyncInitializable {
 						answer += "I did not find a sound with that name. Use \`/get_sounds\` to see a list of sounds on this server."
 						break
 					}
-					await this.provider.addEntree(interaction.guild.id, userArg.value, sound.id)
-					answer += `Added Entree ${soundName} for <@${userArg.value}>`
+					await this.provider.addEntree(interaction.guild.id, user.id, sound.id)
+					answer += `Added Entree ${soundName} for <@${user.id}>`
 					break
 				case "remove_entree":
-					var userArg = args?.find(arg => arg.name === "user")
-					if (userArg?.type !== "USER" || typeof userArg.value !== "string") {
+					var user = comOptions.get("user", true).user
+					if (!user) {
 						answer += "You must provide valid arguments."
 						break
 					}
-					await this.provider.removeEntree(interaction.guild.id, userArg.value)
-					answer += `Removed entree for <@${userArg.value}>.`
+					await this.provider.removeEntree(interaction.guild.id, user.id)
+					answer += `Removed entree for <@${user.id}>.`
 					break
 			}
 			interaction.reply({
@@ -340,7 +341,7 @@ export default class Sounds implements IAsyncInitializable {
 				interaction.reply({ ephemeral: true, content: "You need to be in a voice channel I can join for me to play a sound." })
 				return
 			}
-			let row = new MessageActionRow().addComponents(new MessageButton().setCustomId("cancelPlay").setLabel("Cancel").setStyle("PRIMARY"))
+			let row = new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId("cancelPlay").setLabel("Cancel").setStyle(ButtonStyle.Primary))
 			let result = await this.playSoundInChannel(soundId, member.voice.channel, member.id)
 			switch (result.result) {
 				case PlayResultOption.Played:
@@ -466,27 +467,27 @@ export default class Sounds implements IAsyncInitializable {
 
 	isTextChannel(channel: Channel | PartialDMChannel | null): channel is TextChannel {
 		// Partials are turned off
-		return channel !== null && !channel.partial && channel.isText() && !channel.isThread()
+		return channel !== null && !channel.partial && channel.isTextBased() && !channel.isThread()
 	}
 
 	// SLASH COMMANDS
 	commands = [
-		new SlashCommandBuilder().setName("rebuild").setDescription("Rebuild the sounds channel so that changes become visible.").setDefaultPermission(false),
-		new SlashCommandBuilder().setName("get_sounds").setDescription("Get a list of all sounds on this server").setDefaultPermission(false),
-		new SlashCommandBuilder().setName("add_sound").setDescription("Add a sound to this server").setDefaultPermission(false)
+		new SlashCommandBuilder().setName("rebuild").setDescription("Rebuild the sounds channel so that changes become visible.").setDefaultMemberPermissions(0).setDMPermission(false),
+		new SlashCommandBuilder().setName("get_sounds").setDescription("Get a list of all sounds on this server").setDefaultMemberPermissions(0).setDMPermission(false),
+		new SlashCommandBuilder().setName("add_sound").setDescription("Add a sound to this server").setDefaultMemberPermissions(0).setDMPermission(false)
 			.addStringOption(option => option.setName("name").setDescription("Name of the sound").setRequired(true))
 			.addStringOption(option => option.setName("link").setDescription("Link to the sound file (.mp3, max 200kb)").setRequired(true))
-			.addBooleanOption(option => option.setName("hidden").setDescription("If set to true, this sound will no be playable by button")),
-		new SlashCommandBuilder().setName("rename_sound").setDescription("Rename a sound from this server").setDefaultPermission(false)
+			.addBooleanOption(option => option.setName("hidden").setDescription("If set to true, this sound will not be playable by button")),
+		new SlashCommandBuilder().setName("rename_sound").setDescription("Rename a sound from this server").setDefaultMemberPermissions(0).setDMPermission(false)
 			.addStringOption(option => option.setName("oldname").setDescription("Name of the sound").setRequired(true))
 			.addStringOption(option => option.setName("newname").setDescription("The new name of the sound").setRequired(true)),
-		new SlashCommandBuilder().setName("delete_sound").setDescription("Delete a sound from this server").setDefaultPermission(false)
+		new SlashCommandBuilder().setName("delete_sound").setDescription("Delete a sound from this server").setDefaultMemberPermissions(0).setDMPermission(false)
 			.addStringOption(option => option.setName("name").setDescription("Name of the sound to delete").setRequired(true)),
-		new SlashCommandBuilder().setName("get_entrees").setDescription("Get the list of entrees of this server").setDefaultPermission(false),
-		new SlashCommandBuilder().setName("add_entree").setDescription("Add or change an entree for a user in this server").setDefaultPermission(false)
+		new SlashCommandBuilder().setName("get_entrees").setDescription("Get the list of entrees of this server").setDefaultMemberPermissions(0).setDMPermission(false),
+		new SlashCommandBuilder().setName("add_entree").setDescription("Add or change an entree for a user in this server").setDefaultMemberPermissions(0).setDMPermission(false)
 			.addUserOption(option => option.setName("user").setDescription("User to add entree for").setRequired(true))
 			.addStringOption(option => option.setName("sound").setDescription("Name of the sound").setRequired(true)),
-		new SlashCommandBuilder().setName("remove_entree").setDescription("Remove an entree for a user in this server").setDefaultPermission(false)
+		new SlashCommandBuilder().setName("remove_entree").setDescription("Remove an entree for a user in this server").setDefaultMemberPermissions(0).setDMPermission(false)
 			.addUserOption(option => option.setName("user").setDescription("User to remove entree for").setRequired(true))
 	]
 
@@ -495,42 +496,14 @@ export default class Sounds implements IAsyncInitializable {
 			// Only happens when we get called before logged in.
 			return Promise.reject()
 		}
-		let rest = new REST({ version: "9" }).setToken(this.client.token)
+		let rest = new REST({ version: "10" }).setToken(this.client.token)
 		let route = process.env.NODE_ENV === "DEVELOPMENT" ? Routes.applicationGuildCommands(this.client.user.id, "828763932072214589") : Routes.applicationCommands(this.client.user.id)
 
-		let rawCommands = await rest.put(route, {
+		let data = await rest.put(route, {
 			body: this.commands
 		}) as RawApplicationCommandData[]
 
-		let commands = rawCommands.map(raw => new ApplicationCommand(this.client, raw))
-
-		// Set permission such that guild owner can use commands.
-		this.client.guilds.cache.forEach((guild) => {
-			let permissions: {
-				fullPermissions: GuildApplicationCommandPermissionData[] // This type annotation seems to be requierd as it doesnt work otherwise.
-			} = {
-				fullPermissions: commands.map(command => {
-					return {
-						id: command.id,
-						permissions: [{
-							id: guild.ownerId,
-							type: "USER",
-							permission: true
-						}]
-					}
-				})
-			}
-			try {
-				guild.commands.permissions.set(permissions)
-			} catch (err) {
-				console.error("Error setting permissions for guild " + guild.name + " with id " + guild.id)
-				console.error(err)
-				console.trace()
-			}
-
-		})
-
-
+		console.log("Successfully uploaded slash commands.")
 	}
 }
 

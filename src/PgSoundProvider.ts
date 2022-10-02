@@ -66,7 +66,7 @@ export default class PgSoundProvider implements ISoundProvider {
 		return Promise.all([this.getAmountOfSounds(guildId), this.getLimitForGuild(guildId)])
 			.then(([numSounds, limit]) => new Promise<void>((resolve, reject) => numSounds >= limit ? reject("Limit reached") : resolve()))
 			.then(() => this.download(url, this.basePath + "/" + id + ".mp3"))
-			.then(() => db.query("INSERT INTO sounds.sounds VALUES ($1, $2, $3, $4);", [id, guildId, name, String(hidden)]))
+			.then(() => db.query("INSERT INTO sounds.sounds VALUES ($1, $2, $3, $4);", [id.toString(), guildId, name, String(hidden)]))
 			.then(() => Promise.resolve())
 	}
 

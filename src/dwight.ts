@@ -1,12 +1,11 @@
-import { Client, Intents } from "discord.js"
+import { Client } from "discord.js"
 import Sounds from "./Sounds"
 import * as http from "http"
 
 const client = new Client({
 	intents: [
-		Intents.FLAGS.GUILDS,
-		Intents.FLAGS.GUILD_VOICE_STATES,
-		Intents.FLAGS.GUILD_MESSAGES,
+		"Guilds",
+		"GuildVoiceStates"
 	]
 });
 

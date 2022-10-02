@@ -1,8 +1,8 @@
-import { Pool } from "pg"
+import { Pool, QueryResultRow } from "pg"
 
 const pool = new Pool()
 
-export function query<T>(text: string, params: string[] = []) {
+export function query<T extends QueryResultRow = any>(text: string, params: string[] = []) {
 	return pool.query<T>(text, params)
 }
 

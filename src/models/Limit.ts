@@ -1,17 +1,23 @@
-import { Table, Model, PrimaryKey, Column, DataType, NotNull, AllowNull } from "sequelize-typescript"
+import { DataTypes, InferAttributes, InferCreationAttributes, Model } from "@sequelize/core";
+import { sequelize } from "../SequelizeSoundProvider";
 
-@Table({
-    timestamps: false,
-    schema: "sounds"
-})
-export default class Limit extends Model {
 
-    @PrimaryKey
-    @Column(DataType.BIGINT)
-    guildID: string
+export default class Limit extends Model<InferAttributes<Limit>, InferCreationAttributes<Limit>> {
 
-    @NotNull
-    @AllowNull(false)
-    @Column(DataType.SMALLINT)
-    maxsounds: Number
+    declare guildID: string
+    declare maxsounds: Number
 }
+
+Limit.init({
+    guildID: {
+        type: DataTypes.BIGINT,
+        allowNull: false
+    },
+    maxsounds: {
+        type: DataTypes.SMALLINT,
+        allowNull: false
+    }
+}, {
+    timestamps: false,
+    sequelize: sequelize
+})
