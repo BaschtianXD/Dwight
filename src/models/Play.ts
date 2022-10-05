@@ -1,5 +1,4 @@
-import { Model, DataTypes, InferAttributes, InferCreationAttributes, HasOneGetAssociationMixin, NonAttribute, ForeignKey } from "@sequelize/core"
-import { sequelize } from "../SequelizeSoundProvider"
+import Sequelize, { Model, DataTypes, InferAttributes, InferCreationAttributes, HasOneGetAssociationMixin, NonAttribute, ForeignKey } from "@sequelize/core"
 import Sound from "./Sound"
 
 export default class Play extends Model<InferAttributes<Play>, InferCreationAttributes<Play>> {
@@ -11,25 +10,27 @@ export default class Play extends Model<InferAttributes<Play>, InferCreationAttr
     declare getSound: HasOneGetAssociationMixin<Sound>
 
     declare sound?: NonAttribute<Sound>
-}
 
-Play.init({
-    userID: {
-        type: DataTypes.BIGINT,
-        allowNull: false
-    },
-    soundID: {
-        type: DataTypes.BIGINT,
-        allowNull: false
-    },
-    time: {
-        type: DataTypes.DATE,
-        allowNull: false
+    static add(sequ: Sequelize): void {
+        Play.init({
+            userID: {
+                type: DataTypes.BIGINT,
+                allowNull: false
+            },
+            soundID: {
+                type: DataTypes.BIGINT,
+                allowNull: false
+            },
+            time: {
+                type: DataTypes.DATE,
+                allowNull: false
+            }
+        }, {
+            timestamps: false,
+            sequelize: sequ
+        })
+
+        Play.belongsTo(Sound, { foreignKey: "soundID" })
+        Sound.hasMany(Play, { foreignKey: "soundID" })
     }
-}, {
-    timestamps: false,
-    sequelize: sequelize
-})
-
-Play.belongsTo(Sound, { foreignKey: "soundID" })
-Sound.hasMany(Play, { foreignKey: "soundID" })
+}

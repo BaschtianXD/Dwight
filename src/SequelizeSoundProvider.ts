@@ -20,9 +20,17 @@ export const sequelize = new Sequelize({
 
 export default class SequelizeSoundProvider implements ISoundProvider {
 
-    maxSoundNameLength: number = 64;
+    constructor() {
+        Sound.add(sequelize)
+        Limit.add(sequelize)
+        Play.add(sequelize)
+        Entree.add(sequelize)
+    }
+
+    maxSoundNameLength: number = 64
     basePath = process.env.DWIGHT_SOUNDS_PATH!
     defaultSoundLimit = 20
+
 
     async getSoundsForGuild(guildId: string): Promise<TSoundListEntry[]> {
         const result = await Sound.findAll({

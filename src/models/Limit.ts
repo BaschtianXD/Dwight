@@ -1,23 +1,25 @@
-import { DataTypes, InferAttributes, InferCreationAttributes, Model } from "@sequelize/core";
-import { sequelize } from "../SequelizeSoundProvider";
+import Sequelize, { DataTypes, InferAttributes, InferCreationAttributes, Model } from "@sequelize/core";
 
 
 export default class Limit extends Model<InferAttributes<Limit>, InferCreationAttributes<Limit>> {
 
     declare guildID: string
     declare maxsounds: Number
-}
 
-Limit.init({
-    guildID: {
-        type: DataTypes.BIGINT,
-        allowNull: false
-    },
-    maxsounds: {
-        type: DataTypes.SMALLINT,
-        allowNull: false
+    static add(sequ: Sequelize): void {
+        Limit.init({
+            guildID: {
+                type: DataTypes.BIGINT,
+                allowNull: false,
+                primaryKey: true
+            },
+            maxsounds: {
+                type: DataTypes.SMALLINT,
+                allowNull: false
+            }
+        }, {
+            timestamps: false,
+            sequelize: sequ
+        })
     }
-}, {
-    timestamps: false,
-    sequelize: sequelize
-})
+}
