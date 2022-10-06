@@ -73,9 +73,6 @@ export default class SequelizeSoundProvider implements ISoundProvider {
             return Promise.reject(ErrorTypes.duplicatedName)
         }
         try {
-            // TODO
-            // download to temporary folder and convert to opus
-            // ffmpeg -i 897995667325190145.mp3 -c:a libopus -b:a 64k -vbr on -compression_level 10 -frame_duration 60 897995667325190145.opus
             const tempFilePath = this.basePath + "/" + id + ".mp3"
             const finalFilePath = this.basePath + "/" + id + ".opus"
             await this.download(url, tempFilePath)
