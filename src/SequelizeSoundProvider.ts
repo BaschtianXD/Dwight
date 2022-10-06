@@ -7,7 +7,10 @@ import Play from "./models/Play";
 import Sound from "./models/Sound";
 import * as fs from "fs"
 import Axios from "axios";
-import { exec } from "child_process";
+import { exec as ex } from "child_process";
+import util from "node:util"
+
+const exec = util.promisify(ex)
 
 export const sequelize = new Sequelize({
     dialect: process.env.DBDIALECT! as Dialect,
@@ -73,31 +76,11 @@ export default class SequelizeSoundProvider implements ISoundProvider {
             // TODO
             // download to temporary folder and convert to opus
             // ffmpeg -i 897995667325190145.mp3 -c:a libopus -b:a 64k -vbr on -compression_level 10 -frame_duration 60 897995667325190145.opus
-            const tempFilePath = this.basePath + "/conv/" + id + ".mp3"
+            const tempFilePath = this.basePath + "/" + id + ".mp3"
             const finalFilePath = this.basePath + "/" + id + ".opus"
             await this.download(url, tempFilePath)
-            let prom = new Promise<void>((resolve, reject) => {
-                exec("ffmpeg -i " + tempFilePath + " -c:a libopus -b:a 64k -vbr on -compression_level 10 -frame_duration 60 " + finalFilePath, (err, _stdout, _stderr) => {
-                    if (err) {
-                        reject()
-                    } else {
-                        resolve()
-                    }
-                })
-            })
-            prom.then(() => {
-                let prom = new Promise<void>((resolve, reject) => {
-                    fs.unlink(tempFilePath, (err) => {
-                        if (err) {
-                            reject()
-                        } else {
-                            resolve()
-                        }
-                    })
-                })
-                return prom
-            })
-            await prom
+            await exec("ffmpeg -i " + tempFilePath + " -c:a libopus -b:a 64k -vbr on -compression_level 10 -frame_duration 60 " + finalFilePath)
+            await fs.promises.unlink(tempFilePath)
         } catch (err) {
             return Promise.reject(ErrorTypes.fileTooLarge)
         }
