@@ -7,6 +7,10 @@ import Play from "./models/Play";
 import Sound from "./models/Sound";
 import * as fs from "fs"
 import Axios from "axios";
+import { exec as ex } from "child_process";
+import util from "node:util"
+
+const exec = util.promisify(ex)
 
 export const sequelize = new Sequelize({
     dialect: process.env.DBDIALECT! as Dialect,
@@ -55,7 +59,7 @@ export default class SequelizeSoundProvider implements ISoundProvider {
     }
 
     getPathToSound(soundId: string): Promise<string> {
-        return new Promise(resolve => resolve(this.basePath + "/" + soundId + ".mp3"))
+        return new Promise(resolve => resolve(this.basePath + "/" + soundId + ".opus"))
     }
 
     async addSoundForGuild(guildId: string, url: string, name: string, hidden: boolean): Promise<void> {
@@ -69,7 +73,11 @@ export default class SequelizeSoundProvider implements ISoundProvider {
             return Promise.reject(ErrorTypes.duplicatedName)
         }
         try {
-            await this.download(url, this.basePath + "/" + id + ".mp3")
+            const tempFilePath = this.basePath + "/" + id + ".mp3"
+            const finalFilePath = this.basePath + "/" + id + ".opus"
+            await this.download(url, tempFilePath)
+            await exec("ffmpeg -i " + tempFilePath + " -c:a libopus -b:a 64k -vbr on -compression_level 10 -frame_duration 60 " + finalFilePath)
+            await fs.promises.unlink(tempFilePath)
         } catch (err) {
             return Promise.reject(ErrorTypes.fileTooLarge)
         }
