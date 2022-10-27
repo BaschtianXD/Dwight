@@ -1,4 +1,4 @@
-import { Client, Guild, Snowflake, User, TextChannel, VoiceChannel, Collection, GuildChannelManager, Message, ApplicationCommand, VoiceState, GuildChannel, Channel, GuildMember, StageChannel, GuildChannelCreateOptions, PartialDMChannel, Interaction, CommandInteraction, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessagePayload } from "discord.js";
+import { Client, Guild, Snowflake, User, TextChannel, VoiceChannel, Collection, GuildChannelManager, Message, VoiceState, Channel, GuildMember, StageChannel, GuildChannelCreateOptions, PartialDMChannel, Interaction, CommandInteraction, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { joinVoiceChannel, getVoiceConnection, createAudioResource, createAudioPlayer, AudioPlayerStatus, VoiceConnectionStatus, AudioPlayer } from "@discordjs/voice";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ErrorTypes, ISoundProvider } from "./interfaces/ISoundProvider";
@@ -45,8 +45,9 @@ export default class Sounds implements IAsyncInitializable {
 
 	async onReady(client: Client) {
 		await this.initiateSlashCommands()
-		const guilds = Array.from(client.guilds.cache.values())
-		guilds.reduce((acc, cur) => acc.then(() => this.initForGuild(cur)), Promise.resolve())
+		const guilds = await client.guilds.fetch()
+		// const guilds = Array.from(client.guilds.cache.values())
+		guilds.reduce((acc, cur) => acc.then(async () => this.initForGuild(await cur.fetch())), Promise.resolve())
 			.catch(reason => {
 				console.error(new Date() + ": " + reason)
 				console.trace()
@@ -91,7 +92,8 @@ export default class Sounds implements IAsyncInitializable {
 			]
 		}
 
-		const oldChannel = channelManager.cache.find(channel => channel.name === "sounds" && channel.type === ChannelType.GuildText) as GuildChannel
+		const channels = await channelManager.fetch()
+		const oldChannel = channels.find(channel => channel?.name === "sounds" && channel.type === ChannelType.GuildText) as TextChannel | undefined
 		if (oldChannel) {
 			if (oldChannel.deletable) {
 				options.parent = oldChannel.parentId ?? undefined
@@ -509,10 +511,10 @@ export default class Sounds implements IAsyncInitializable {
 
 /**
  * Splits an array into an array of array of chunks of the source array
- * @example chunk([1,2,3,4,5], 2) => [[1,2],[3,4],[5]]
  * @param src Array to chunk
  * @param count Chunksize
  * @returns Array of arrays with the given size
+ * @example chunk([1,2,3,4,5], 2) => [[1,2],[3,4],[5]]
  */
 function chunk<T>(src: Array<T>, count: number): Array<Array<T>> {
 	return src.reduce((acc, curr, index) => {
