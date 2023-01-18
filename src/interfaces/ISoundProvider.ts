@@ -1,7 +1,6 @@
 import { Snowflake } from "discord.js";
-import IAsyncInitializable from "./IAsyncInitializable";
 
-export interface ISoundProvider extends IAsyncInitializable {
+export interface ISoundProvider {
 
 	/**
 	 * 

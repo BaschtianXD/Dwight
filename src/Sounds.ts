@@ -1,11 +1,10 @@
 import { Client, Guild, Snowflake, TextChannel, VoiceChannel, Collection, GuildChannelManager, Message, VoiceState, Channel, StageChannel, GuildChannelCreateOptions, PartialDMChannel, Interaction, CommandInteraction, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { joinVoiceChannel, getVoiceConnection, createAudioResource, createAudioPlayer, AudioPlayerStatus, VoiceConnectionStatus, AudioPlayer, StreamType } from "@discordjs/voice";
-import IAsyncInitializable from "./interfaces/IAsyncInitializable";
 import { ISoundProvider } from "./interfaces/ISoundProvider";
 import PrismaSoundProvider from "./PrismaSoundProvider";
 import { createReadStream } from "fs";
 
-export default class Sounds implements IAsyncInitializable {
+export default class Sounds {
 
 	client: Client
 
@@ -25,15 +24,12 @@ export default class Sounds implements IAsyncInitializable {
 		this.provider = new PrismaSoundProvider()
 	}
 
-	initialize(): Promise<void> {
-		return this.provider.initialize()
-			.then(_ => {
-				this.client.on("guildCreate", guild => this.onGuildCreate(guild))
-				this.client.on("guildDelete", guild => this.onGuildDelete(guild))
-				this.client.on("voiceStateUpdate", (oldState, newState) => this.onVoiceStateChanged(oldState as VoiceState, newState as VoiceState))
-				this.client.on("interactionCreate", interaction => this.onInteractionCreate(interaction))
-				console.log("Sounds initialized")
-			})
+	initialize() {
+		this.client.on("guildCreate", guild => this.onGuildCreate(guild))
+		this.client.on("guildDelete", guild => this.onGuildDelete(guild))
+		this.client.on("voiceStateUpdate", (oldState, newState) => this.onVoiceStateChanged(oldState as VoiceState, newState as VoiceState))
+		this.client.on("interactionCreate", interaction => this.onInteractionCreate(interaction))
+		console.log("Sounds initialized")
 	}
 
 	async initForGuild(guild: Guild) {

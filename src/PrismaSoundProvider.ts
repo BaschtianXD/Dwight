@@ -72,8 +72,4 @@ export default class PrismaSoundProvider implements ISoundProvider {
         })
     }
 
-    initialize(): Promise<void> {
-        throw new Error("Method not implemented.");
-    }
-
 }
