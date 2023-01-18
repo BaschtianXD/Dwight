@@ -1,17 +1,11 @@
-import { Client, Guild, Snowflake, User, TextChannel, VoiceChannel, Collection, GuildChannelManager, Message, VoiceState, Channel, GuildMember, StageChannel, GuildChannelCreateOptions, PartialDMChannel, Interaction, CommandInteraction, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
-import { joinVoiceChannel, getVoiceConnection, createAudioResource, createAudioPlayer, AudioPlayerStatus, VoiceConnectionStatus, AudioPlayer } from "@discordjs/voice";
+import { Client, Guild, Snowflake, TextChannel, VoiceChannel, Collection, GuildChannelManager, Message, VoiceState, Channel, StageChannel, GuildChannelCreateOptions, PartialDMChannel, Interaction, CommandInteraction, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+import { joinVoiceChannel, getVoiceConnection, createAudioResource, createAudioPlayer, AudioPlayerStatus, VoiceConnectionStatus, AudioPlayer, StreamType } from "@discordjs/voice";
 import IAsyncInitializable from "./interfaces/IAsyncInitializable";
-import { ErrorTypes, ISoundProvider } from "./interfaces/ISoundProvider";
-import SequelizeSoundProvider from "./SequelizeSoundProvider";
-import { REST } from '@discordjs/rest'
-import { Routes } from "discord-api-types/v9"
-import { SlashCommandBuilder } from "@discordjs/builders";
-import { RawApplicationCommandData } from "discord.js/typings/rawDataTypes";
+import { ISoundProvider } from "./interfaces/ISoundProvider";
+import PrismaSoundProvider from "./PrismaSoundProvider";
+import { createReadStream } from "fs";
 
 export default class Sounds implements IAsyncInitializable {
-
-	// PARAMETER
-	maxFileSize = 204800 // 200 kb
 
 	client: Client
 
@@ -28,29 +22,17 @@ export default class Sounds implements IAsyncInitializable {
 		this.channels = []
 		this.needsRebuild = new Set()
 		this.players = new Collection()
-		this.provider = new SequelizeSoundProvider()
+		this.provider = new PrismaSoundProvider()
 	}
 
 	initialize(): Promise<void> {
 		return this.provider.initialize()
 			.then(_ => {
-				this.client.on("ready", () => this.onReady(this.client))
 				this.client.on("guildCreate", guild => this.onGuildCreate(guild))
 				this.client.on("guildDelete", guild => this.onGuildDelete(guild))
 				this.client.on("voiceStateUpdate", (oldState, newState) => this.onVoiceStateChanged(oldState as VoiceState, newState as VoiceState))
 				this.client.on("interactionCreate", interaction => this.onInteractionCreate(interaction))
 				console.log("Sounds initialized")
-			})
-	}
-
-	async onReady(client: Client) {
-		await this.initiateSlashCommands()
-		const guilds = await client.guilds.fetch()
-		// const guilds = Array.from(client.guilds.cache.values())
-		guilds.reduce((acc, cur) => acc.then(async () => this.initForGuild(await cur.fetch())), Promise.resolve())
-			.catch(reason => {
-				console.error(new Date() + ": " + reason)
-				console.trace()
 			})
 	}
 
@@ -145,7 +127,8 @@ export default class Sounds implements IAsyncInitializable {
 	async playSoundInChannel(soundId: Snowflake, voiceChannel: VoiceChannel | StageChannel, userId: Snowflake): Promise<PlayResult> {
 		return new Promise(async (resolve, reject) => {
 			var oldPlayer = this.players.get(voiceChannel.id)
-			let resource = createAudioResource(await this.provider.getPathToSound(soundId))
+			const pathToSound = await this.provider.getPathToSound(soundId)
+			let resource = createAudioResource(createReadStream(pathToSound), { inputType: StreamType.Opus })
 			if (oldPlayer) {
 				// Currently playing a sound in a channel
 				// Overwrite old resource and play new
@@ -189,14 +172,11 @@ export default class Sounds implements IAsyncInitializable {
 	}
 
 	onGuildCreate(guild: Guild) {
-		this.initForGuild(guild)
-			.catch(error => {
-				console.error(new Date() + ": " + error)
-				console.trace()
-			})
+		console.log("ADDED to new guild: " + guild.name + " id: " + guild.id)
 	}
 
 	onGuildDelete(guild: Guild): void {
+		console.log("REMOVED from guild: " + guild.name + " id: " + guild.id)
 		this.provider.removeAllDataForGuild(guild.id)
 			.catch(error => {
 				console.error(new Date() + ": " + error)
@@ -205,13 +185,13 @@ export default class Sounds implements IAsyncInitializable {
 	}
 
 	onVoiceStateChanged(oldState: VoiceState, newState: VoiceState): void {
-		if (oldState.member?.id === oldState.client.user?.id || oldState.channel || !newState.member || !newState.channel) return
-		this.provider.getEntreeSoundIdForGuildUser(newState.guild.id, newState.member.id)
+		if (oldState.channel || !newState.channel) return
+		this.provider.getEntreeSoundIdForGuildUser(newState.guild.id, newState.id)
 			.then(soundId => {
 				if (!soundId || !newState.channel) {
 					return
 				}
-				this.playSoundInChannel(soundId, newState.channel, newState.client.user!.id)
+				this.playSoundInChannel(soundId, newState.channel, newState.id)
 			})
 	}
 
@@ -225,103 +205,6 @@ export default class Sounds implements IAsyncInitializable {
 					content: "You can only use interactions with me in a sound channel I created."
 				})
 			return
-		}
-		if (interaction.isCommand() && interaction.guild) { // guild required for typescript typechecker
-			let comOptions = interaction.options
-			var answer = ""
-			switch (interaction.commandName) {
-				case "rebuild":
-					answer += "I will rebuild this channel soon..."
-					this.initForGuild(interaction.guild)
-					break
-				case "get_sounds":
-					var sounds = await this.provider.getSoundsForGuild(interaction.guild.id)
-					answer = `Sounds on server ${interaction.guild.name}:`
-					for (let sound of sounds) {
-						answer += `\n\t- ${sound.name}${sound.hidden ? " (hidden)" : ""}`
-					}
-					break
-				case "add_sound":
-					var name = comOptions.get("name", true).value
-					var link = comOptions.get("link", true).value
-					var hidden = comOptions.get("hidden")?.value
-					if (typeof name !== "string" || typeof link !== "string" || (typeof hidden !== "undefined" && typeof hidden !== "boolean")) {
-						// Wrong arguments
-						answer += "You must provide valid arguments"
-						break
-					}
-					await this.provider.addSoundForGuild(interaction.guild.id, link, name, hidden ?? false)
-					answer += `Added ${name}. Use \`/rebuild\` to apply the changes.`
-					break
-				case "delete_sound":
-					var name = comOptions.get("name", true)?.value
-					if (typeof name !== "string") {
-						answer += "You must provide valid arguments"
-						break
-					}
-					let delSounds = await this.provider.getSoundsForGuild(interaction.guild.id)
-					let delSound = delSounds.find(sound => sound.name === name)
-					if (!delSound) {
-						answer += "I did not find a sound with that name. Use `/get_sounds` to see a list of sounds on this server."
-						break
-					}
-					await this.provider.removeSound(delSound.id)
-					answer += `Removed ${name} from this server. Use \`/rebuild\` to apply the changes.`
-					break
-				case "rename_sound":
-					let oldName = comOptions.get("oldname", true)?.value
-					let newName = comOptions.get("newname", true)?.value
-					if (typeof oldName !== "string" || typeof newName !== "string") {
-						answer += "You must provide valid arguments"
-						break
-					}
-					let oldsounds = await this.provider.getSoundsForGuild(interaction.guild.id)
-					let oldsound = oldsounds.find(sound => sound.name === oldName)
-					if (!oldsound) {
-						answer += "I did not find a sound with that name. Use \`/get_sounds\` to see a list of sounds on this server."
-						break
-					}
-					await this.provider.renameSound(oldsound.id, newName)
-					answer += `Renamed ${oldName} to ${newName}. Use \`/rebuild\` to apply the changes.`
-					break
-				case "get_entrees":
-					let entrees = await this.provider.getEntreesForGuild(interaction.guild.id)
-					answer += `Entrees on server ${interaction.guild.name}:`
-					for (let entree of entrees) {
-						answer += `\n\t- ${entree.soundName} for <@${entree.userId}>`
-					}
-					break
-				case "add_entree":
-					var user = comOptions.get("user", true).user
-					var soundNameArg = comOptions.get("sound", true)
-					if (!user || typeof soundNameArg.value !== "string") {
-						answer += "You must provide valid arguments."
-						break
-					}
-					var soundName = soundNameArg.value
-					let entreeSounds = await this.provider.getSoundsForGuild(interaction.guild.id)
-					let sound = entreeSounds.find(sound => sound.name === soundName)
-					if (!sound) {
-						answer += "I did not find a sound with that name. Use \`/get_sounds\` to see a list of sounds on this server."
-						break
-					}
-					await this.provider.addEntree(interaction.guild.id, user.id, sound.id)
-					answer += `Added Entree ${soundName} for <@${user.id}>`
-					break
-				case "remove_entree":
-					var user = comOptions.get("user", true).user
-					if (!user) {
-						answer += "You must provide valid arguments."
-						break
-					}
-					await this.provider.removeEntree(interaction.guild.id, user.id)
-					answer += `Removed entree for <@${user.id}>.`
-					break
-			}
-			interaction.reply({
-				ephemeral: true,
-				content: answer
-			})
 		}
 		if (interaction.isButton()) {
 			let soundId = interaction.customId
@@ -359,93 +242,6 @@ export default class Sounds implements IAsyncInitializable {
 		return Promise.resolve()
 	}
 
-	async removeEntree(gmember: GuildMember, user: User) {
-		return this.provider.removeEntree(gmember.guild.id, gmember.id)
-			.then(_ => {
-				user.send("Removed entrees for users.")
-			})
-			.catch(reason => {
-				user.send("There was an unexplained error.")
-				console.error(Date.now() + ": " + reason)
-				console.trace()
-			})
-	}
-
-	async addEntree(soundName: string, gmember: GuildMember, user: User) {
-		const genericHelp = " Send `!help` to the sound channel for more informamtion."
-		return this.provider.getSoundsForGuild(gmember.guild.id)
-			.then(sounds => {
-				const sound = sounds.find((value => value.name === soundName))
-				if (!sound) {
-					user.send("I can't find a sound that fits this name. Use `!get_sounds` to see all sounds." + genericHelp)
-					return Promise.reject()
-				}
-				return this.provider.addEntree(gmember.guild.id, gmember.id, sound.id)
-			})
-			.then(_ => {
-				user.send("Added entrees for users.")
-			})
-			.catch(reason => {
-				if (reason) {
-					user.send("There was an unexplained error.")
-					console.error(Date.now() + ": " + reason)
-					console.trace()
-				}
-			})
-	}
-
-	async removeSound(name: string, guild: Guild, user: User) {
-		return this.provider.getSoundsForGuild(guild.id)
-			.then(list => {
-				const rest = list.filter(value => value.name === name)
-				if (rest[0]) {
-					this.provider.removeSound(rest[0].id)
-						.then(() => {
-							this.needsRebuild.add(guild)
-							user.send("Removed " + name + " from " + guild.name + ".\nUse `!rebuild` in the sound channel to rebuild the channel once all changes are applied.")
-						})
-						.catch(err => {
-							if (err === ErrorTypes.soundUsed) {
-								user.send("The sound you tried to delete " + name + " is used as entree and cannot be deleted.")
-								return
-							}
-							user.send("There was an error deleting the requested sound.")
-							console.error(Date.now() + ": " + JSON.stringify(err))
-							console.trace()
-						})
-				} else {
-					user.send("No sound with that name found. Use `!get_sounds` to see all sounds.")
-				}
-			})
-	}
-
-	async renameSound(oldName: string, newName: string, guild: Guild, user: User) {
-		const sounds = await this.provider.getSoundsForGuild(guild.id)
-		const sound = sounds.find(sound => sound.name === oldName)
-		if (!sound) {
-			user.send("I did not find a sound with the name " + oldName + ". Check your sounds with `!get_sounds`.")
-			return
-		}
-		this.provider.renameSound(sound.id, newName)
-			.then(_ => {
-				this.needsRebuild.add(guild)
-				user.send("Renamed sound " + oldName + " to " + newName + ". Use `!rebuild` to rebuild the sound channel once all changes are applied.")
-			})
-	}
-
-	async sendSoundsForGuild(guild: Guild, responder: User) {
-		return this.provider.getSoundsForGuild(guild.id)
-			.then(sounds => {
-				var mess = "Sounds for server " + guild.name + ":"
-				sounds.forEach(sound => {
-					mess += "\n\t- " + (sound.hidden ? "*" : "") + sound.name + (sound.hidden ? "*" : "")
-				})
-				mess += "\nThere " + (sounds.length > 1 ? "are " : "is ") + sounds.length + " sound" + (sounds.length > 1 ? "s" : "") + " on this server."
-				mess += "\nCursive sounds are hidden."
-				responder.send(mess)
-			})
-	}
-
 	/**
 	 * Checks whether a guild has an already build sound channel
 	 */
@@ -470,42 +266,6 @@ export default class Sounds implements IAsyncInitializable {
 	isTextChannel(channel: Channel | PartialDMChannel | null): channel is TextChannel {
 		// Partials are turned off
 		return channel !== null && !channel.partial && channel.isTextBased() && !channel.isThread()
-	}
-
-	// SLASH COMMANDS
-	commands = [
-		new SlashCommandBuilder().setName("rebuild").setDescription("Rebuild the sounds channel so that changes become visible.").setDefaultMemberPermissions(0).setDMPermission(false),
-		new SlashCommandBuilder().setName("get_sounds").setDescription("Get a list of all sounds on this server").setDefaultMemberPermissions(0).setDMPermission(false),
-		new SlashCommandBuilder().setName("add_sound").setDescription("Add a sound to this server").setDefaultMemberPermissions(0).setDMPermission(false)
-			.addStringOption(option => option.setName("name").setDescription("Name of the sound").setRequired(true))
-			.addStringOption(option => option.setName("link").setDescription("Link to the sound file (.mp3, max 200kb)").setRequired(true))
-			.addBooleanOption(option => option.setName("hidden").setDescription("If set to true, this sound will not be playable by button")),
-		new SlashCommandBuilder().setName("rename_sound").setDescription("Rename a sound from this server").setDefaultMemberPermissions(0).setDMPermission(false)
-			.addStringOption(option => option.setName("oldname").setDescription("Name of the sound").setRequired(true))
-			.addStringOption(option => option.setName("newname").setDescription("The new name of the sound").setRequired(true)),
-		new SlashCommandBuilder().setName("delete_sound").setDescription("Delete a sound from this server").setDefaultMemberPermissions(0).setDMPermission(false)
-			.addStringOption(option => option.setName("name").setDescription("Name of the sound to delete").setRequired(true)),
-		new SlashCommandBuilder().setName("get_entrees").setDescription("Get the list of entrees of this server").setDefaultMemberPermissions(0).setDMPermission(false),
-		new SlashCommandBuilder().setName("add_entree").setDescription("Add or change an entree for a user in this server").setDefaultMemberPermissions(0).setDMPermission(false)
-			.addUserOption(option => option.setName("user").setDescription("User to add entree for").setRequired(true))
-			.addStringOption(option => option.setName("sound").setDescription("Name of the sound").setRequired(true)),
-		new SlashCommandBuilder().setName("remove_entree").setDescription("Remove an entree for a user in this server").setDefaultMemberPermissions(0).setDMPermission(false)
-			.addUserOption(option => option.setName("user").setDescription("User to remove entree for").setRequired(true))
-	]
-
-	async initiateSlashCommands(): Promise<void> {
-		if (!this.client.user?.id || !this.client.token) {
-			// Only happens when we get called before logged in.
-			return Promise.reject()
-		}
-		let rest = new REST({ version: "10" }).setToken(this.client.token)
-		let route = process.env.NODE_ENV === "DEVELOPMENT" ? Routes.applicationGuildCommands(this.client.user.id, "828763932072214589") : Routes.applicationCommands(this.client.user.id)
-
-		let data = await rest.put(route, {
-			body: this.commands
-		}) as RawApplicationCommandData[]
-
-		console.log("Successfully uploaded slash commands.")
 	}
 }
 

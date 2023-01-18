@@ -1,5 +1,6 @@
 import { Snowflake } from "discord.js";
 import * as fs from "fs";
+import { envVars } from "./dwight";
 import { ISoundProvider, TEntreeListEntry, TSoundListEntry } from "./interfaces/ISoundProvider";
 
 /**
@@ -13,7 +14,7 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 	maxSoundNameLength = 64
 
 	constructor() {
-		this.baseFilePath = process.env.DWIGHT_SOUNDS_PATH || process.cwd() + "/sounds"
+		this.baseFilePath = envVars.SOUNDS_FOLDER_PATH
 
 		if (!this.baseFilePath) {
 			console.error("No baseFilePath for sounds")
