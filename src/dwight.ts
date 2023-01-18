@@ -1,10 +1,7 @@
 import { Client } from "discord.js"
 import Sounds from "./Sounds"
 import express from "express";
-import auth from "basic-auth";
-import { env } from "process";
-import timeSafeCompare from "tsscmp";
-import { envSchema, formatErrors } from "./env/schema.mjs";
+import { envSchema, formatErrors } from "./env/schema.js";
 
 
 // CHECK ENV VARIABLES
