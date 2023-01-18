@@ -1,6 +1,5 @@
 import { Client, Guild, Snowflake, TextChannel, VoiceChannel, Collection, GuildChannelManager, Message, VoiceState, Channel, StageChannel, GuildChannelCreateOptions, PartialDMChannel, Interaction, CommandInteraction, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { joinVoiceChannel, getVoiceConnection, createAudioResource, createAudioPlayer, AudioPlayerStatus, VoiceConnectionStatus, AudioPlayer, StreamType } from "@discordjs/voice";
-import { ISoundProvider } from "./interfaces/ISoundProvider";
 import PrismaSoundProvider from "./PrismaSoundProvider";
 import { createReadStream } from "fs";
 
@@ -13,7 +12,7 @@ export default class Sounds {
 
 	channels: Snowflake[] // Id of channel
 
-	provider: ISoundProvider
+	provider: PrismaSoundProvider
 	needsRebuild: Set<Guild>
 
 	constructor(client: Client) {
@@ -33,31 +32,31 @@ export default class Sounds {
 	}
 
 	async initForGuild(guild: Guild) {
+		console.log("Build Channel in guild: " + guild.name)
 		if (!this.client.user) {
 			// Typescript cleanup
 			throw new Error("no user available. log in first!")
 		}
-		if (!await this.checkChannel(guild)) {
-			const channelManager = guild.channels
-			return this.createChannel(channelManager, this.client.user.id)
-				.then(channel => {
-					this.addSoundsToChannel(channel)
-				})
-				.catch(reason => {
-					console.error(new Date() + ": " + reason)
-					console.trace()
-					return Promise.reject()
-				})
+
+		const channelManager = guild.channels
+		try {
+			const channel = await this.createChannel(channelManager, this.client.user.id)
+			this.addSoundsToChannel(channel)
+		} catch (err) {
+			console.error(new Date() + ": " + err)
+			console.trace()
+			return Promise.reject()
 		}
 
 	}
 
 	async createChannel(channelManager: GuildChannelManager, userId: Snowflake): Promise<TextChannel> {
+		console.log("Creating Channel...")
 
 		const options: GuildChannelCreateOptions = {
 			name: "sounds",
 			type: ChannelType.GuildText,
-			topic: "Here are the sounds you can play. Press the reaction of a sound to play it in your voice channel. Use my / commands to interact with me.",
+			topic: "Here are the sounds you can play. Press the button of a sound to play it in your voice channel.",
 			permissionOverwrites: [
 				{
 					id: channelManager.guild.id,
@@ -84,9 +83,13 @@ export default class Sounds {
 						return channel
 					})
 			} else {
-				let owner = await channelManager.guild.members.fetch(channelManager.guild.ownerId)
-				if (owner) {
-					owner.send("I could not delete the current sounds channel. Please check my permissions and allow me to do so. Then try again or contact my creator Bauer#9456.")
+				try {
+					let owner = await channelManager.guild.members.fetch(channelManager.guild.ownerId)
+					if (owner) {
+						owner.send("I could not delete the current sounds channel. Please check my permissions and allow me to do so. Then try again or contact my creator Bauer#9456.")
+					}
+				} catch (err) {
+					console.error(new Date() + ": " + err)
 				}
 				return Promise.reject("missing permission")
 			}
@@ -100,7 +103,9 @@ export default class Sounds {
 	}
 
 	async addSoundsToChannel(channel: TextChannel): Promise<void> {
+		console.log("Adding sounds to channel...")
 		let sounds = (await this.provider.getSoundsForGuild(channel.guild.id)).filter(sound => !sound.hidden)
+		console.log("Got " + sounds.length + " sounds")
 		let rows = chunk(sounds, 5).map(sounds => {
 			let row = new ActionRowBuilder<ButtonBuilder>()
 			for (let sound of sounds) {
