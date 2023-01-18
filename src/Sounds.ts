@@ -32,7 +32,6 @@ export default class Sounds {
 	}
 
 	async initForGuild(guild: Guild) {
-		console.log("Build Channel in guild: " + guild.name)
 		if (!this.client.user) {
 			// Typescript cleanup
 			throw new Error("no user available. log in first!")
@@ -51,7 +50,6 @@ export default class Sounds {
 	}
 
 	async createChannel(channelManager: GuildChannelManager, userId: Snowflake): Promise<TextChannel> {
-		console.log("Creating Channel...")
 
 		const options: GuildChannelCreateOptions = {
 			name: "sounds",
@@ -103,9 +101,7 @@ export default class Sounds {
 	}
 
 	async addSoundsToChannel(channel: TextChannel): Promise<void> {
-		console.log("Adding sounds to channel...")
 		let sounds = (await this.provider.getSoundsForGuild(channel.guild.id)).filter(sound => !sound.hidden)
-		console.log("Got " + sounds.length + " sounds")
 		let rows = chunk(sounds, 5).map(sounds => {
 			let row = new ActionRowBuilder<ButtonBuilder>()
 			for (let sound of sounds) {
@@ -129,7 +125,7 @@ export default class Sounds {
 		return new Promise(async (resolve, reject) => {
 			var oldPlayer = this.players.get(voiceChannel.id)
 			const pathToSound = await this.provider.getPathToSound(soundId)
-			let resource = createAudioResource(createReadStream(pathToSound), { inputType: StreamType.Opus })
+			let resource = createAudioResource(pathToSound) // TODO change to not call ffmpeg on the fly
 			if (oldPlayer) {
 				// Currently playing a sound in a channel
 				// Overwrite old resource and play new
@@ -148,7 +144,7 @@ export default class Sounds {
 					let prom = new Promise<void>((resolve, reject) => {
 						connection.subscribe(player) // Player should start automatically
 						this.provider.soundPlayed(userId, soundId)
-							.catch(_ => console.log("Could not log a play."))
+							.catch(_ => console.warn("Could not log a play."))
 						player.on(AudioPlayerStatus.Idle, () => {
 							connection.disconnect() // TODO check if these actions were successfull
 							connection.destroy()

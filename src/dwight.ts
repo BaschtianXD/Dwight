@@ -37,12 +37,12 @@ client.on("ready", () => {
 })
 
 client.on("rateLimit", (info) => {
-	console.log("DISCORD API: Hit rate limit")
-	console.log(JSON.stringify(info))
+	console.warn("DISCORD API: Hit rate limit")
+	console.warn(JSON.stringify(info))
 })
 
 client.on("warn", info => {
-	console.log("DISCORD API: WARNING - " + info)
+	console.warn("DISCORD API: WARNING - " + info)
 })
 
 // Services
@@ -54,7 +54,7 @@ Promise.all([
 ])
 	.then(_ => client.login(envVars.DISCORD_BOT_AUTH_TOKEN))
 	.catch(reason => {
-		console.log(Date.now() + ": " + reason)
+		console.error(Date.now() + ": " + reason)
 		process.exit(1)
 	})
 

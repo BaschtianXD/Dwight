@@ -18,13 +18,13 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 
 		if (!this.baseFilePath) {
 			console.error("No baseFilePath for sounds")
-			console.log(this.baseFilePath)
+			console.error(this.baseFilePath)
 			process.exit(1)
 		}
 		// This runs on setup, otherwise we cant check higher up.
 		const files = fs.readdirSync(this.baseFilePath)
 		if (files.length === 0) {
-			console.log("Could not read filepath: " + this.baseFilePath)
+			console.error("Could not read filepath: " + this.baseFilePath)
 			return
 		}
 	}

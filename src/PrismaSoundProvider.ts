@@ -5,7 +5,6 @@ import { ISoundProvider, TEntreeListEntry, TSoundListEntry } from "./interfaces/
 export default class PrismaSoundProvider implements ISoundProvider {
 
     prisma: PrismaClient
-    basePath = envVars.SOUNDS_FOLDER_PATH
 
     constructor() {
         this.prisma = new PrismaClient()
@@ -30,7 +29,7 @@ export default class PrismaSoundProvider implements ISoundProvider {
     }
 
     async getPathToSound(soundId: string): Promise<string> {
-        return this.basePath + "/" + soundId + ".opus"
+        return envVars.SOUNDS_FOLDER_PATH + "/" + soundId + ".opus"
     }
 
     async removeAllDataForGuild(guildId: string): Promise<void> {
