@@ -6,8 +6,6 @@ export const envSchema = z.object({
     DISCORD_BOT_AUTH_TOKEN: z.string(),
     SOUNDS_FOLDER_PATH: z.string(),
     PORT: z.coerce.number(),
-    CB_USERNAME: z.string(),
-    CB_PASSWORD: z.string()
 });
 
 export const formatErrors = (

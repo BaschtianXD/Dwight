@@ -72,11 +72,6 @@ app.get("/live", (req, res) => {
 	res.send()
 })
 app.get("/build/:guildid", async (req, res) => {
-	const creds = auth(req)
-	if (!creds || !timeSafeCompare(creds.name, env.CB_USERNAME ?? "no") || timeSafeCompare(creds.pass, env.CB_PASSWORD ?? "no")) {
-		res.status(401).send()
-		return
-	}
 	const guildid = req.params.guildid
 	try {
 		const guild = await client.guilds.fetch(guildid)
