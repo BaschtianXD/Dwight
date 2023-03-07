@@ -1,7 +1,6 @@
 import { Client, Guild, Snowflake, TextChannel, VoiceChannel, Collection, GuildChannelManager, Message, VoiceState, Channel, StageChannel, GuildChannelCreateOptions, PartialDMChannel, Interaction, CommandInteraction, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { joinVoiceChannel, getVoiceConnection, createAudioResource, createAudioPlayer, AudioPlayerStatus, VoiceConnectionStatus, AudioPlayer, StreamType } from "@discordjs/voice";
 import PrismaSoundProvider from "./PrismaSoundProvider";
-import { createReadStream } from "fs";
 
 export default class Sounds {
 
@@ -17,7 +16,6 @@ export default class Sounds {
 
 	constructor(client: Client) {
 		this.client = client
-		this.channels = []
 		this.needsRebuild = new Set()
 		this.players = new Collection()
 		this.provider = new PrismaSoundProvider()
@@ -77,7 +75,6 @@ export default class Sounds {
 				return oldChannel.delete()
 					.then(() => channelManager.create(options) as Promise<TextChannel>)
 					.then(channel => {
-						this.channels.push(channel.id)
 						return channel
 					})
 			} else {
@@ -94,7 +91,6 @@ export default class Sounds {
 		} else {
 			return channelManager.create(options)
 				.then(channel => {
-					this.channels.push(channel.id)
 					return channel as TextChannel
 				})
 		}
@@ -194,14 +190,11 @@ export default class Sounds {
 
 	async onInteractionCreate(interaction: Interaction): Promise<void> {
 
-		if (!interaction.channel || !interaction.inGuild() || !interaction.member?.user || !this.channels.includes(interaction.channel.id)) {
-			// not sent from a valid guild channel
-			if (interaction.isCommand())
-				(interaction as CommandInteraction).reply({
-					ephemeral: true,
-					content: "You can only use interactions with me in a sound channel I created."
-				})
-			return
+		if (interaction.isCommand()) {
+			(interaction as CommandInteraction).reply({
+				ephemeral: true,
+				content: "I no longer support configuration via commands. Visit https://dwight.baschtianxd.com to configure me."
+			})
 		}
 		if (interaction.isButton()) {
 			let soundId = interaction.customId
