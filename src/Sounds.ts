@@ -181,10 +181,10 @@ export default class Sounds {
 		if (oldState.channel || !newState.channel) return
 		this.provider.getEntreeSoundIdForGuildUser(newState.guild.id, newState.id)
 			.then(soundId => {
-				if (!soundId || !newState.channel) {
+				if (!soundId || !newState.channel || !this.client.user) {
 					return
 				}
-				this.playSoundInChannel(soundId, newState.channel, newState.id)
+				this.playSoundInChannel(soundId, newState.channel, this.client.user.id)
 			})
 	}
 
