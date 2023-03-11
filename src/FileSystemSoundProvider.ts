@@ -28,6 +28,9 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 			return
 		}
 	}
+	addSoundToGuild(guildId: string, name: string, hidden: boolean, createdBy: any): Promise<string> {
+		throw new Error("Method not implemented.");
+	}
 	renameSound(soundId: string, newName: string): Promise<void> {
 		return Promise.resolve()
 	}
