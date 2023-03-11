@@ -10,6 +10,18 @@ export default class PrismaSoundProvider implements ISoundProvider {
         this.prisma = new PrismaClient()
     }
 
+    async addSoundToGuild(guildid: string, name: string, hidden: boolean, createdBy: string): Promise<string> {
+        const queryResult = await this.prisma.sound.create({
+            data: {
+                guildid,
+                hidden,
+                name
+            }
+        })
+
+        return queryResult.soundid
+    }
+
     async getSoundsForGuild(guildId: string): Promise<TSoundListEntry[]> {
         const queryResult = await this.prisma.sound.findMany({
             select: {
@@ -18,7 +30,8 @@ export default class PrismaSoundProvider implements ISoundProvider {
                 hidden: true
             },
             where: {
-                guildid: guildId
+                guildid: guildId,
+                deleted: false
             }
         })
         return queryResult.map(sound => ({

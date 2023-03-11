@@ -253,6 +253,11 @@ export default class Sounds {
 		return messages
 	}
 
+	async addSoundToGuild(guildid: string, name: string, hidden: boolean, createdBy: string): Promise<string> {
+		const soundId = this.provider.addSoundToGuild(guildid, name, hidden, createdBy)
+		return soundId
+	}
+
 	isTextChannel(channel: Channel | PartialDMChannel | null): channel is TextChannel {
 		// Partials are turned off
 		return channel !== null && !channel.partial && channel.isTextBased() && !channel.isThread()

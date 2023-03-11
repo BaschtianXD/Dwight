@@ -37,6 +37,15 @@ export interface ISoundProvider {
 	 */
 	soundPlayed(userId: Snowflake, soundId: Snowflake): Promise<void>
 
+	/**
+	 * Creates a new sound for a guild
+	 * @param guildId Id of the guild
+	 * @param name Name of the sound
+	 * @param hidden Whether to hide the sound
+	 * @param createdBy userid of the user that created the sound
+	 */
+	addSoundToGuild(guildId: Snowflake, name: string, hidden: boolean, createdBy): Promise<string>
+
 }
 
 export type TSoundListEntry = {
