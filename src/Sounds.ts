@@ -120,39 +120,49 @@ export default class Sounds {
 	async playSoundInChannel(soundId: Snowflake, voiceChannel: VoiceChannel | StageChannel, userId: Snowflake): Promise<PlayResult> {
 		return new Promise(async (resolve, reject) => {
 			var oldPlayer = this.players.get(voiceChannel.id)
-			const pathToSound = await this.provider.getPathToSound(soundId)
-			let resource = createAudioResource(pathToSound) // TODO change to not call ffmpeg on the fly
-			if (oldPlayer) {
-				// Currently playing a sound in a channel
-				// Overwrite old resource and play new
-				oldPlayer.play(resource)
-				resolve({ result: PlayResultOption.Overwritten })
-			} else {
-				let player = createAudioPlayer()
-				this.players.set(voiceChannel.id, player)
-				player.play(resource) // Does not start playing until we have at leats 1 subscriber
-				let connection = joinVoiceChannel({
-					channelId: voiceChannel.id,
-					guildId: voiceChannel.guildId,
-					adapterCreator: voiceChannel.guild.voiceAdapterCreator
-				})
-				connection.on(VoiceConnectionStatus.Ready, () => {
-					let prom = new Promise<void>((resolve, reject) => {
-						connection.subscribe(player) // Player should start automatically
-						this.provider.soundPlayed(userId, soundId)
-							.catch(_ => console.warn("Could not log a play."))
-						player.on(AudioPlayerStatus.Idle, () => {
-							connection.disconnect() // TODO check if these actions were successfull
-							connection.destroy()
-							player.stop()
-							this.players.delete(voiceChannel.id)
-							resolve()
-						})
+			try {
+				const pathToSound = await this.provider.getPathToSound(soundId)
+				let resource = createAudioResource(pathToSound) // TODO change to not call ffmpeg on the fly
+				if (oldPlayer) {
+					// Currently playing a sound in a channel
+					// Overwrite old resource and play new
+					oldPlayer.play(resource)
+					resolve({ result: PlayResultOption.Overwritten })
+				} else {
+					let player = createAudioPlayer()
+					this.players.set(voiceChannel.id, player)
+					player.play(resource) // Does not start playing until we have at leats 1 subscriber
+					let connection = joinVoiceChannel({
+						channelId: voiceChannel.id,
+						guildId: voiceChannel.guildId,
+						adapterCreator: voiceChannel.guild.voiceAdapterCreator
 					})
-					resolve({ result: PlayResultOption.Played, finish: prom })
+					connection.on(VoiceConnectionStatus.Ready, () => {
+						let prom = new Promise<void>((resolve, reject) => {
+							connection.subscribe(player) // Player should start automatically
+							this.provider.soundPlayed(userId, soundId)
+								.catch(_ => console.warn("Could not log a play."))
+							player.on(AudioPlayerStatus.Idle, () => {
+								connection.disconnect() // TODO check if these actions were successfull
+								connection.destroy()
+								player.stop()
+								this.players.delete(voiceChannel.id)
+								resolve()
+							})
+						})
+						resolve({ result: PlayResultOption.Played, finish: prom })
 
-				})
+					})
+				}
+			} catch (err) {
+				if (err instanceof Error) {
+					resolve({ result: PlayResultOption.Error, message: "There was an error. Please try again later." })
+				} else {
+					console.error("Unhandled error:")
+					console.error(JSON.stringify(err))
+				}
 			}
+
 		})
 	}
 
@@ -227,6 +237,8 @@ export default class Sounds {
 				case PlayResultOption.Overwritten:
 					// Do nothing
 					break
+				case PlayResultOption.Error:
+					interaction.reply({ content: result.message, ephemeral: true })
 			}
 		}
 		return Promise.resolve()
@@ -286,6 +298,7 @@ function chunk<T>(src: Array<T>, count: number): Array<Array<T>> {
 enum PlayResultOption {
 	Played,
 	Overwritten,
+	Error
 }
 
 type PlayResult = {
@@ -293,4 +306,7 @@ type PlayResult = {
 	finish: Promise<void>
 } | {
 	result: PlayResultOption.Overwritten
+} | {
+	result: PlayResultOption.Error,
+	message: string
 }

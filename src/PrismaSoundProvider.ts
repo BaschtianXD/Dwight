@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { envVars } from "./dwight";
 import { ISoundProvider, TEntreeListEntry, TSoundListEntry } from "./interfaces/ISoundProvider";
+import fs from "fs";
 
 export default class PrismaSoundProvider implements ISoundProvider {
 
@@ -42,7 +43,13 @@ export default class PrismaSoundProvider implements ISoundProvider {
     }
 
     async getPathToSound(soundId: string): Promise<string> {
-        return envVars.SOUNDS_FOLDER_PATH + "/" + soundId + ".opus"
+        let path = envVars.SOUNDS_FOLDER_PATH + "/" + soundId + ".opus"
+        if (fs.existsSync(path)) {
+            return path
+        } else {
+            console.error("File for requested sound does not exist. Soundid: " + soundId)
+            throw (new Error("file not found"))
+        }
     }
 
     async removeAllDataForGuild(guildId: string): Promise<void> {
