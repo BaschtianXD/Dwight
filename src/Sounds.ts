@@ -260,7 +260,7 @@ export default class Sounds {
 
 	isTextChannel(channel: Channel | PartialDMChannel | null): channel is TextChannel {
 		// Partials are turned off
-		return channel !== null && !channel.partial && channel.isTextBased() && !channel.isThread()
+		return channel !== null && !channel.partial && typeof channel.isTextBased === "function" && channel.isTextBased() && typeof channel.isThread === "function" && !channel.isThread()
 	}
 }
 
