@@ -43,8 +43,11 @@ client.on("ready", () => {
 		console.log("ID: " + guild.id + ", Name: " + guild.name)
 	})
 
-	app.listen(8080, () => {
-		console.log("Listening on port " + 8080)
+	internalApp.listen(envVars.INTERNALPORT, () => {
+		console.log("Internal listening on port " + envVars.INTERNALPORT)
+	})
+	externalApp.listen(envVars.EXTERNALPORT, () => {
+		console.log("External listening on port " + envVars.EXTERNALPORT)
 	})
 })
 
@@ -74,13 +77,9 @@ Promise.all([
 const { privateKey, publicKey } = generateKeyPairSync("ec", {
 	namedCurve: "sect239k1"
 })
-const auth = expressBasicAuth({
-	users: {
-		[envVars.CB_USERNAME]: envVars.CB_PASSWORD
-	}
-})
-const app = express()
-app.get("/live", (req, res) => {
+
+const internalApp = express()
+internalApp.get("/live", (req, res) => {
 	if (client.user) {
 		res.writeHead(200)
 	} else {
@@ -88,7 +87,7 @@ app.get("/live", (req, res) => {
 	}
 	res.send()
 })
-app.get("/build/:guildid", auth, async (req: expressBasicAuth.IBasicAuthedRequest, res) => {
+internalApp.get("/build/:guildid", async (req, res) => {
 	const guildid = req.params.guildid
 	try {
 		const guild = await client.guilds.fetch(guildid)
@@ -99,7 +98,7 @@ app.get("/build/:guildid", auth, async (req: expressBasicAuth.IBasicAuthedReques
 	}
 
 })
-app.get("/presign", auth, async (req: expressBasicAuth.IBasicAuthedRequest, res) => {
+internalApp.get("/presign", async (req, res) => {
 	const { guildid, userid } = req.query
 	const exp = Date.now() + 1000 * 60 // 1 minute valid
 
@@ -119,7 +118,8 @@ app.get("/presign", auth, async (req: expressBasicAuth.IBasicAuthedRequest, res)
 	})
 
 })
-app.put("/sound/:guildid", upload.single("sound"), async (req, res) => {
+const externalApp = express()
+externalApp.put("/sound/:guildid", upload.single("sound"), async (req, res) => {
 	const guildid = req.params.guildid
 	const { key, exp } = req.query
 	const { userid, name, hidden } = req.body

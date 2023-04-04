@@ -5,9 +5,8 @@ export const envSchema = z.object({
     NODE_ENV: z.enum(["development", "test", "production"]),
     DISCORD_BOT_AUTH_TOKEN: z.string(),
     SOUNDS_FOLDER_PATH: z.string(),
-    PORT: z.coerce.number(),
-    CB_USERNAME: z.string(),
-    CB_PASSWORD: z.string()
+    EXTERNALPORT: z.coerce.number(),
+    INTERNALPORT: z.coerce.number()
 });
 
 export const formatErrors = (
