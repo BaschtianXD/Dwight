@@ -71,3 +71,7 @@ deploy-container.yaml
 
 #my stuff
 .me
+
+# local dev stuff
+prisma/dev.db
+sounds/*
