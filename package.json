@@ -22,7 +22,7 @@
   "homepage": "https://github.com/BaschtianXD/Dwight#readme",
   "dependencies": {
     "@discordjs/opus": "^0.9.0",
-    "@discordjs/voice": "^0.14.0",
+    "@discordjs/voice": "^0.16.0",
     "@prisma/client": "4.12.0",
     "async": "^3.2.4",
     "axios": "^1.2.2",
