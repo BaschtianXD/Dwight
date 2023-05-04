@@ -205,19 +205,25 @@ export const discordRouter = router({
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: "You have reached the limit." })
         }
 
-        const sound = await query.ctx.prisma.sound.create({
-            data: {
-                name: query.input.name,
-                guildid: query.input.guildid,
-                hidden: query.input.hidden,
-                createdById: query.ctx.session.user.id
-            }
-        })
-
         if (env.NODE_ENV === "development") {
             return
         }
-        // await transcodeSound(sound.soundid, query.input.fileData)
+        // forward request to backend
+
+        const formData = new FormData()
+        formData.append("sound", await (await fetch(query.input.fileData)).blob())
+
+        const response = await fetch(env.DWIGHT_BASE + "/sound/" + query.input.guildid, {
+            method: "POST",
+            headers: {
+                "Authorization": Buffer.from(env.DWIGHT_USERNAME + ":" + env.DWIGHT_PASSWORD).toString("base64")
+            },
+            body: formData
+        })
+
+        if (response.status !== 201) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failure to upload file" })
+        }
 
     }),
 
@@ -440,9 +446,9 @@ export const discordRouter = router({
             // no rebuild needed
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No rebuild needed" })
         }
-        if (env.DWIGHT_CALLBACK) {
+        if (env.DWIGHT_BASE) {
             try {
-                await fetch(env.DWIGHT_CALLBACK + "/" + query.input.guildid)
+                await fetch(env.DWIGHT_BASE + "/build/" + query.input.guildid)
             } catch (err) {
                 console.error("Callback error")
                 console.error(err)
@@ -531,29 +537,6 @@ export const discordRouter = router({
         return "none"
     })
 })
-
-async function transcodeSound(filename: string, datab64: string) {
-
-    return new Promise<void>((resolve, reject) => {
-        const buffer = Buffer.from(datab64, "base64")
-        const finalFilePath = env.SOUNDS_FOLDER + "/" + filename + ".opus"
-
-        const child = spawn("ffmpeg", ["-f", "mp3", "-i", "pipe:", "-c:a", "libopus", "-b:a", "64k", "-vbr", "on", "-compression_level", "10", "-frame_duration", "60", finalFilePath], {
-            stdio: ["pipe", "ignore", process.stderr]
-        })
-
-        child.on("exit", (code) => {
-            if (code !== 0) {
-                reject()
-            } else {
-                resolve()
-            }
-        })
-
-        child.stdin.end(buffer)
-
-    })
-}
 
 // AUTH
 type GuildId = string

@@ -22,11 +22,9 @@ export const serverSchema = z.object({
   DISCORD_CLIENT_ID: z.string(),
   DISCORD_CLIENT_SECRET: z.string(),
   DISCORD_BOT_AUTH_TOKEN: z.string(),
-  SOUNDS_FOLDER: z.string(),
-  DWIGHT_CALLBACK:
-    process.env.NODE_ENV === "production"
-      ? z.string()
-      : z.string().optional(),
+  DWIGHT_BASE: z.string().url(),
+  DWIGHT_USERNAME: z.string(),
+  DWIGHT_PASSWORD: z.string(),
   DEFAULT_LIMIT: z.coerce.number()
 });
 
