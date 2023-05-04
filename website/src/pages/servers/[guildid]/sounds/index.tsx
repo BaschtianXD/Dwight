@@ -11,7 +11,6 @@ import { Dialog, Menu, Switch, Transition } from "@headlessui/react";
 import { pageClasses } from "../../../../components/shared";
 import NavHeader from "../../../../components/NavHeader";
 import { RubikFont } from "../../../../common";
-import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
 
 type DragError = "TooManyFiles" | "InvalidFileType" | "InvalidType" | "Filesize"
 
@@ -94,20 +93,6 @@ const newSoundReducer: Reducer<SoundObject | null, NewSoundReducerAction> = (pre
             } : null
     }
 }
-
-export async function getServerSideProps(context: NextPageContext) {
-    // set HTTP header
-    if (context.res) {
-        // Headers required for ffmpeg.wasm -> needs sharedarraybuffer
-        context.res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-        context.res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
-    }
-
-    return {
-        props: {},
-    };
-}
-
 
 const MaxFileSize = 204800
 
@@ -331,23 +316,19 @@ const SoundsPage: NextPage = () => {
                                                 <PositiveButton disabled={!soundObject.name || (soundDialogType === "create" && !soundObject.file)}
                                                     onClick={async () => {
                                                         if (soundDialogType === "create" && soundObject.file) {
-                                                            const typedBuffer = new Uint8Array(await soundObject.file.arrayBuffer())
-                                                            const ffmpeg = createFFmpeg({
-                                                                corePath: "https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js"
+                                                            const arrBuff = await soundObject.file.arrayBuffer()
+                                                            const b64 = Buffer.from(arrBuff).toString("base64")
+                                                            soundCreateMutation.mutate({ name: soundObject.name, guildid: guildid, hidden: soundObject.hidden, fileData: b64 }, {
+                                                                onSuccess: () => {
+                                                                    limitQuery.refetch()
+                                                                    pendingChangesQuery.refetch()
+                                                                    soundsQuery.refetch()
+                                                                    setShowSoundDialog(false)
+                                                                },
+                                                                onError: (error) => {
+                                                                    console.error(error.message)
+                                                                }
                                                             })
-                                                            await ffmpeg.load()
-                                                            ffmpeg.FS("writeFile", "input.mp3", typedBuffer)
-                                                            await ffmpeg.run("-f", "mp3", "-i", "input.mp3", "-c:a", "libopus", "-b:a", "64k", "-vbr", "on", "-compression_level", "10", "-frame_duration", "60", "output.opus")
-                                                            const fileContent = ffmpeg.FS("readFile", "output.opus")
-                                                            const b64 = Buffer.from(fileContent).toString("base64")
-                                                            // soundCreateMutation.mutate({ name: soundObject.name, guildid: guildid, hidden: soundObject.hidden, fileData: b64 }, {
-                                                            //     onSuccess: () => {
-                                                            //         limitQuery.refetch()
-                                                            //         pendingChangesQuery.refetch()
-                                                            //         soundsQuery.refetch()
-                                                            //         setShowSoundDialog(false)
-                                                            //     }
-                                                            // })
                                                         } else if (soundDialogType === "edit" && soundObject.soundid) {
                                                             await soundUpdateMutation.mutateAsync({ name: soundObject.name, hidden: soundObject.hidden, soundid: soundObject.soundid })
                                                             pendingChangesQuery.refetch()

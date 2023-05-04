@@ -3,7 +3,6 @@ import Sounds from "./Sounds"
 import express from "express";
 import { envSchema, formatErrors } from "./env/schema.js";
 import multer from "multer"
-import { createSign, createVerify, generateKeyPairSync } from "crypto";
 import expressBasicAuth from "express-basic-auth";
 import { spawn } from "child_process";
 
@@ -61,34 +60,20 @@ client.on("warn", info => {
 const sounds = new Sounds(client)
 
 
-Promise.all([
-	sounds.initialize()
-])
+Promise.all([sounds.initialize()])
 	.then(_ => client.login(envVars.DISCORD_BOT_AUTH_TOKEN))
 	.catch(reason => {
 		console.error(Date.now() + ": " + reason)
 		process.exit(1)
 	})
 
-
-const { privateKey, publicKey } = generateKeyPairSync("ec", {
-	namedCurve: "sect239k1"
-})
 const auth = expressBasicAuth({
 	users: {
 		[envVars.CB_USERNAME]: envVars.CB_PASSWORD
 	}
 })
 const app = express()
-app.get("/live", (req, res) => {
-	if (client.user) {
-		res.writeHead(200)
-	} else {
-		res.writeHead(500)
-	}
-	res.send()
-})
-app.get("/build/:guildid", auth, async (req: expressBasicAuth.IBasicAuthedRequest, res) => {
+app.get("/build/:guildid", auth, async (req, res) => {
 	const guildid = req.params.guildid
 	try {
 		const guild = await client.guilds.fetch(guildid)
@@ -99,40 +84,11 @@ app.get("/build/:guildid", auth, async (req: expressBasicAuth.IBasicAuthedReques
 	}
 
 })
-app.get("/presign", auth, async (req: expressBasicAuth.IBasicAuthedRequest, res) => {
-	const { guildid, userid } = req.query
-	const exp = Date.now() + 1000 * 60 // 1 minute valid
-
-	if (typeof guildid !== "string") {
-		res.status(400)
-		res.send("Malformed guildid")
-		return
-	}
-
-	const sign = createSign("SHA256")
-	sign.update(guildid + userid + exp)
-	const signature = sign.sign(privateKey, "hex")
-
-	res.send({
-		exp: exp,
-		key: signature
-	})
-
-})
-app.put("/sound/:guildid", upload.single("sound"), async (req, res) => {
+app.post("/sound/:guildid", auth, upload.single("sound"), async (req, res) => {
 	const guildid = req.params.guildid
-	const { key, exp } = req.query
 	const { userid, name, hidden } = req.body
 	const soundFile = req.file
 
-	if (typeof key !== "string") {
-		res.status(400).send("Malformed key")
-		return
-	}
-	if (typeof exp !== "string" || Number.isNaN(parseInt(exp, 10))) {
-		res.status(400).send("Malformed exp")
-		return
-	}
 	if (typeof userid !== "string") {
 		res.status(400).send("Malformed userid")
 		return
@@ -147,18 +103,6 @@ app.put("/sound/:guildid", upload.single("sound"), async (req, res) => {
 	}
 	if (!soundFile) {
 		res.status(400).send("Missing file")
-		return
-	}
-
-	const verify = createVerify('SHA256');
-	verify.update(guildid + userid + exp)
-	const valid = verify.verify(publicKey, key, "hex")
-
-	const now = Date.now()
-
-	if (!valid || now > parseInt(exp, 10)) {
-		res.status(400)
-		res.send("invalid key")
 		return
 	}
 
@@ -180,6 +124,6 @@ app.put("/sound/:guildid", upload.single("sound"), async (req, res) => {
 
 	child.stdin.end(soundFile.buffer)
 
-
+	res.status(201).send()
 
 })
