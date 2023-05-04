@@ -1,0 +1,2 @@
+export const pageClasses = "w-full h-full flex flex-col p-4 mx-auto gap-4 lg:gap-2 overflow-visible grow"
+export const inviteLink = "https://discord.com/api/oauth2/authorize?client_id=609005073531404304&permissions=2184309776&scope=bot%20applications.commands"
