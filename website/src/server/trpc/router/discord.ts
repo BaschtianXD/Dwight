@@ -3,7 +3,6 @@ import { z } from "zod";
 import { env } from "../../../env/server.mjs";
 import { DiscordApiError, GuildMemberObject, GuildObject, MeGuildResponseBody } from "../../../types/discord-api";
 import { protectedProcedure, router } from "../trpc";
-import { spawn } from "child_process";
 import { Cache } from "memory-cache"
 
 export const discordRouter = router({
