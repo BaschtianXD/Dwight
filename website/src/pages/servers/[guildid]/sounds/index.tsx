@@ -1,4 +1,4 @@
-import type { NextPage, NextPageContext } from "next";
+import type { NextPage } from "next";
 import { useRouter } from "next/router";
 import { trpc } from "../../../../utils/trpc";
 import { CheckCircleIcon, ChevronDownIcon, EyeIcon, EyeSlashIcon, PencilSquareIcon, PlusCircleIcon, TrashIcon } from "@heroicons/react/24/outline"

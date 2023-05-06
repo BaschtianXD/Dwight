@@ -11,9 +11,11 @@ import { DiscordAccessTokenResponse } from "../../../types/discord-api";
 export const authOptions: NextAuthOptions = {
   // Include user.id on session
   callbacks: {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async jwt({ token, user, account }) {
       return token
     },
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async session({ session, user, token }) {
       if (session.user) {
         const discordAccount = await prisma.account.findFirstOrThrow({
