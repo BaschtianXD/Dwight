@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { ZodError, z } from "zod";
+import { z } from "zod";
 import { env } from "../../../env/server.mjs";
 import { DiscordApiError, GuildMemberObject, GuildObject, MeGuildResponseBody } from "../../../types/discord-api";
 import { protectedProcedure, router } from "../trpc";
