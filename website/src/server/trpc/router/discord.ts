@@ -210,7 +210,7 @@ export const discordRouter = router({
         // forward request to backend
 
         const formData = new FormData()
-        formData.append("sound", await (await fetch(query.input.fileData)).blob())
+        formData.append("sound", await (await fetch("data:audio/mp3;base64," + query.input.fileData)).blob())
 
         const response = await fetch(env.DWIGHT_BASE + "/sound/" + query.input.guildid, {
             method: "POST",
