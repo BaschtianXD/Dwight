@@ -73,6 +73,9 @@ const auth = expressBasicAuth({
 	}
 })
 const app = express()
+app.get("/", async (req, res) => {
+	res.status(200).send("Alive")
+})
 app.get("/build/:guildid", auth, async (req, res) => {
 	const guildid = req.params.guildid
 	try {

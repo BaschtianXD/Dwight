@@ -18,7 +18,6 @@ export default class FileSystemSoundProvider implements ISoundProvider {
 
 		if (!this.baseFilePath) {
 			console.error("No baseFilePath for sounds")
-			console.error(this.baseFilePath)
 			process.exit(1)
 		}
 		// This runs on setup, otherwise we cant check higher up.

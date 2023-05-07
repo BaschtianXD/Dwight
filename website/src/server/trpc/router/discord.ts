@@ -1,9 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
+import { ZodError, z } from "zod";
 import { env } from "../../../env/server.mjs";
 import { DiscordApiError, GuildMemberObject, GuildObject, MeGuildResponseBody } from "../../../types/discord-api";
 import { protectedProcedure, router } from "../trpc";
 import { Cache } from "memory-cache"
+import type { RESTGetAPICurrentUserGuildsResult } from "discord.js";
 
 export const discordRouter = router({
     getGuilds: protectedProcedure.query(async (query) => {
@@ -22,8 +23,9 @@ export const discordRouter = router({
         const accessToken = discordAccount.access_token
 
         try {
+            // get user guilds
             const response = await fetch("https://discord.com/api/users/@me/guilds", {
-                method: "get",
+                method: "GET",
                 headers: new Headers({
                     'Authorization': 'Bearer ' + accessToken
                 })
@@ -52,13 +54,17 @@ export const discordRouter = router({
                 }
             })
 
+            // get bot guild
             const botResponse = await fetch("https://discord.com/api/users/@me/guilds", {
-                method: "get",
+                method: "GET",
                 headers: new Headers({
                     'Authorization': 'Bot ' + env.DISCORD_BOT_AUTH_TOKEN
                 })
             })
-            const botGuilds = MeGuildResponseBody.parse(await botResponse.json())
+            if (botResponse.status !== 200) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Discord API Error" })
+            }
+            const botGuilds = await botResponse.json() as RESTGetAPICurrentUserGuildsResult
 
             const intersection = ownedGuilds.filter(botGuild => botGuilds.some(userGuild => botGuild.id === userGuild.id))
 
@@ -71,7 +77,7 @@ export const discordRouter = router({
                 guilds: guildMap
             }
         } catch (error) {
-            throw error
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Discord API Error 2" })
         }
 
 
@@ -84,24 +90,30 @@ export const discordRouter = router({
         const botToken = env.DISCORD_BOT_AUTH_TOKEN
 
         // fetch guild
-        const response = await fetch("https://discord.com/api/guilds/" + query.input.guildid, {
-            method: "get",
-            headers: new Headers({
-                'Authorization': 'Bot ' + botToken
+        try {
+            const response = await fetch("https://discord.com/api/guilds/" + query.input.guildid, {
+                method: "get",
+                headers: new Headers({
+                    'Authorization': 'Bot ' + botToken
+                })
             })
-        })
-        const json = await response.json()
-        const guildParseResult = GuildObject.safeParse(json)
-        if (!guildParseResult.success) {
-            console.log(guildParseResult.error)
-            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Discord API Error: Cannot retrieve Server" })
+            const json = await response.json()
+            const guildParseResult = GuildObject.safeParse(json)
+            if (!guildParseResult.success) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Discord API Error: Cannot retrieve Server" })
+            }
+
+            // await new Promise(r => setTimeout(r, 5000));
+
+            return {
+                guild: guildParseResult.data
+            }
+        }
+        catch (err) {
+            console.error(JSON.stringify(err))
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Callback Error" })
         }
 
-        // await new Promise(r => setTimeout(r, 5000));
-
-        return {
-            guild: guildParseResult.data
-        }
     }),
 
     getCountsForGuild: protectedProcedure.input(z.object({ guildid: z.string() })).query(async query => {
@@ -204,26 +216,36 @@ export const discordRouter = router({
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: "You have reached the limit." })
         }
 
-        if (env.NODE_ENV === "development") {
-            return
-        }
-        // forward request to backend
+        const buffer = Buffer.from(query.input.fileData, "base64")
+        const arrBuffer = Uint8Array.from(buffer)
 
         const formData = new FormData()
-        formData.append("sound", await (await fetch("data:audio/mp3;base64," + query.input.fileData)).blob())
+        formData.append("sound", new Blob([arrBuffer], { type: "audio/mpeg" }))
+        formData.append("userid", query.ctx.session.user.discordId)
+        formData.append("name", query.input.name)
+        formData.append("hidden", query.input.hidden ? "true" : "false")
 
-        const response = await fetch(env.DWIGHT_BASE + "/sound/" + query.input.guildid, {
-            method: "POST",
-            headers: {
-                "Authorization": Buffer.from(env.DWIGHT_USERNAME + ":" + env.DWIGHT_PASSWORD).toString("base64")
-            },
-            body: formData
-        })
+        try {
+            const response = await fetch(env.DWIGHT_BASE + "/sound/" + query.input.guildid, {
+                method: "POST",
+                headers: {
+                    "Authorization": "Basic " + Buffer.from(env.DWIGHT_USERNAME + ":" + env.DWIGHT_PASSWORD).toString("base64")
+                },
+                body: formData
+            })
 
-        if (response.status !== 201) {
-            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failure to upload file" })
+            if (response.status !== 201) {
+                console.error("Status: " + response.status)
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failure to upload file" })
+            }
         }
-
+        catch (err) {
+            if (err instanceof TypeError) {
+                console.error("TypeError")
+                console.error("Message: " + err.message)
+            }
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to reach backend" })
+        }
     }),
 
     updateSound: protectedProcedure.input(z.object({ soundid: z.string(), name: z.string(), hidden: z.boolean() })).mutation(async query => {
@@ -447,7 +469,11 @@ export const discordRouter = router({
         }
         if (env.DWIGHT_BASE) {
             try {
-                await fetch(env.DWIGHT_BASE + "/build/" + query.input.guildid)
+                await fetch(env.DWIGHT_BASE + "/build/" + query.input.guildid, {
+                    headers: {
+                        "Authorization": "Basic " + Buffer.from(env.DWIGHT_USERNAME + ":" + env.DWIGHT_PASSWORD).toString("base64")
+                    },
+                })
             } catch (err) {
                 console.error("Callback error")
                 console.error(err)

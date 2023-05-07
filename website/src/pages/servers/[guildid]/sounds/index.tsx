@@ -161,18 +161,15 @@ const SoundsPage: NextPage = () => {
                 }
                 const item = items[0]
                 if (item.kind !== "file") {
-                    console.log(item.kind)
                     setDragError("InvalidType")
                     return
                 }
                 if (item.type !== "audio/mpeg") {
                     setDragError("InvalidFileType")
-                    console.log("File Type:" + item.type)
                     return
                 }
                 const file = item.getAsFile()
                 if (!file) {
-                    console.error("no file")
                     return
                 }
                 if (file.size > MaxFileSize) {
@@ -266,7 +263,7 @@ const SoundsPage: NextPage = () => {
                                         as="h3"
                                         className="text-xl font-medium leading-6 mb-4"
                                     >
-                                        {soundDialogType === "create" ? "Create new Sound (transcode on client)" : "Edit Sound"}
+                                        {soundDialogType === "create" ? "Create new Sound" : "Edit Sound"}
                                     </Dialog.Title>
                                     {soundObject && <div className="flex flex-col gap-2">
                                         <div>
@@ -324,9 +321,6 @@ const SoundsPage: NextPage = () => {
                                                                     pendingChangesQuery.refetch()
                                                                     soundsQuery.refetch()
                                                                     setShowSoundDialog(false)
-                                                                },
-                                                                onError: (error) => {
-                                                                    console.error(error.message)
                                                                 }
                                                             })
                                                         } else if (soundDialogType === "edit" && soundObject.soundid) {
