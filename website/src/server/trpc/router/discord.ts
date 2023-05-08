@@ -379,10 +379,23 @@ export const discordRouter = router({
             })
         })
 
-        const guildMembers = await z.array(GuildMemberObject).parseAsync(await botResponse.json()) // TODO error handling
+        if (botResponse.status !== 200) {
+            console.log(`Discord API Status ${botResponse.status} - https://discord.com/api/guilds/${query.input.guildid}/members?limit=1000`)
+        }
+        const responseJson = await botResponse.json()
+        const parseResult = await z.array(GuildMemberObject).safeParseAsync(responseJson) // TODO error handling
+
+        if (!parseResult.success) {
+            console.error("Discord API Error - parse get guild members")
+            console.error(responseJson)
+            console.error(JSON.stringify(parseResult.error, undefined, 4))
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Discord API Error" })
+        }
+
+        const guildMembers = parseResult.data
 
         const result = guildMembers.filter(member => {
-            return member.user.id !== "609005073531404304"
+            return member.user.id !== "609005073531404304" // dwight himself
         }).map(member => ({
             userid: member.user.id,
             name: member.nick ?? member.user.username,
@@ -577,10 +590,6 @@ async function getGuildMember(guildid: GuildId, discordUserId: string) {
                 'Authorization': 'Bot ' + env.DISCORD_BOT_AUTH_TOKEN
             })
         })
-        if (guildMemberResponse.status === 404) {
-            // This happens when someone tries to access a guild they're not a member of
-            return null
-        }
         if (guildMemberResponse.status !== 200) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Discord API Error" })
         }
