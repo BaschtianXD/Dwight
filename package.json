@@ -1,7 +1,0 @@
-{
-    "name": "dwight",
-    "workspaces": [
-        "bot",
-        "website"
-    ]
-}
