@@ -37,7 +37,7 @@
     "reflect-metadata": "^0.1.13",
     "sodium": "^3.0.2",
     "tsscmp": "^1.0.6",
-    "typescript": "^4.9.4",
+    "typescript": "^5.0.4",
     "zod": "^3.20.2"
   },
   "devDependencies": {
