@@ -1,13 +1,11 @@
-import { type NextPage } from "next";
-import { signIn, useSession } from "next-auth/react";
 import Head from "next/head";
 import Link from "next/link";
 import type { FC } from "react";
-import { DefaultButton, LinkButton } from "../../components/form";
+import { LinkButton } from "../../components/form";
 import { inviteLink, pageClasses } from "../../components/shared";
+import Step2 from "./Step2";
 
-const GetStartedPage: NextPage = () => {
-    const session = useSession()
+const GetStartedPage = () => {
     return (
         <div className={pageClasses}>
             <Head>
@@ -23,13 +21,7 @@ const GetStartedPage: NextPage = () => {
             </StepBox>
             <StepBox headline="Step 2: Sign in">
                 <p>Sign in with your Discord account.</p>
-                {session.data ?
-                    <p>You are already logged in. Go to step 3.</p>
-                    :
-                    <div className="w-full flex flex-row items-center justify-center mt-4">
-                        <DefaultButton onClick={() => signIn("discord")}>Sign In</DefaultButton>
-                    </div>
-                }
+                <Step2 />
 
             </StepBox>
             <StepBox headline="Step 3: Add Sounds">

@@ -1,3 +1,5 @@
+"use client"
+
 import { Listbox } from "@headlessui/react"
 import Link from "next/link"
 import type { ChangeEventHandler, FC, MouseEventHandler, ReactNode } from "react";
